@@ -8,10 +8,10 @@ Created on Sun May 12 20:11:28 2019
 import adsk, re
 from xml.etree.ElementTree import Element, SubElement
 from ..utils import utils
-
+import json 
 class Link:
 
-    def __init__(self, name, xyz, center_of_mass, repo, mass, inertia_tensor):
+    def __init__(self, name, xyz, center_of_mass, repo, mass, inertia_tensor, color = 'silver'):
         """
         Parameters
         ----------
@@ -41,6 +41,7 @@ class Link:
         self.remain_repo_addr = repo[len(self.pkg_name):]
         self.mass = mass
         self.inertia_tensor = inertia_tensor
+        self.color = color
         
     def make_link_xml(self):
         """
@@ -72,7 +73,7 @@ class Link:
             # mesh_v.attrib = {'filename':'file://' + '$(find %s)' % self.pkg_name + self.remain_repo_addr + self.name + '.stl','scale':'0.001 0.001 0.001'}
             mesh_v.attrib = {'filename':'package://%s' % self.pkg_name + self.remain_repo_addr + self.name + '.stl','scale':'0.001 0.001 0.001'}
             material = SubElement(visual, 'material')
-            material.attrib = {'name':'silver'}
+            material.attrib = {'name':'%s' % self.color}
             
             # collision
             collision = SubElement(link, 'collision')
@@ -86,7 +87,7 @@ class Link:
         self.link_xml = "\n".join(utils.prettify(link).split("\n")[1:])
 
 
-def make_inertial_dict(root, msg):
+def make_inertial_dict(root, msg, colors_dict, links_colors_dict, ui, design):
     """      
     Parameters
     ----------
@@ -111,7 +112,7 @@ def make_inertial_dict(root, msg):
         occs_dict = {}
         prop = occs.getPhysicalProperties(adsk.fusion.CalculationAccuracy.VeryHighCalculationAccuracy)
         
-        occs_dict['name'] = re.sub('[ :()]', '_', occs.name)
+        occs_dict['name'] = re.sub('[ :()]', '_', occs.name.split(" ", 1)[0])
 
         mass = prop.mass  # kg
         occs_dict['mass'] = mass
@@ -126,6 +127,28 @@ def make_inertial_dict(root, msg):
         if occs.component.name == 'base_link':
             inertial_dict['base_link'] = occs_dict
         else:
-            inertial_dict[re.sub('[ :()]', '_', occs.name)] = occs_dict
+            inertial_dict[re.sub('[ :()]', '_', occs.name.split(" ", 1)[0])] = occs_dict
+            if occs.bRepBodies.count > 0:
+                appearance = occs.bRepBodies[0].appearance
+                color = None
+                try:
+                    globalColor = design.appearances.itemByName(appearance.name)
+                except:
+                    globalColor = None
+                if globalColor is None:
+                    color = occs.bRepBodies[0].appearance.appearanceProperties.itemByName('Color')
+                else:
+                    color = globalColor.appearanceProperties.itemByName('Color')
+                if color and (color.value.red != 255 or color.value.green != 255 or color.value.blue != 255):
+                    try:
+                        existing_color = [a[0] for a in colors_dict.items() if a[1] and a[1][0] == color.value.red and a[1][1] == color.value.green and a[1][2] == color.value.blue][0]
+                        if existing_color:
+                            links_colors_dict[re.sub('[ :()]', '_', occs.name.split(" ", 1)[0])] = existing_color
+                    except:
+                        # generate random name
+                        new_color_name = 'color' + str(len(colors_dict))
+                        colors_dict[new_color_name] = [color.value.red, color.value.green, color.value.blue]
+                        links_colors_dict[re.sub('[ :()]', '_', occs.name.split(" ", 1)[0])] = new_color_name
+                    # ui.messageBox("r = {0}, g = {1}, b = {2}".format(color.value.red, color.value.green, color.value.blue))
 
-    return inertial_dict, msg
+    return inertial_dict, msg, colors_dict, links_colors_dict

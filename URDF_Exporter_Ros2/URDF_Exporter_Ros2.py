@@ -62,7 +62,9 @@ def run(context):
             return 0
 
         # Generate inertial_dict
-        inertial_dict, msg = Link.make_inertial_dict(root, msg)
+        links_colors_dict = {}
+        colors_dict = {}
+        inertial_dict, msg, colors_dict, links_colors_dict = Link.make_inertial_dict(root, msg, colors_dict, links_colors_dict, ui, design)
         if msg != success_msg:
             ui.messageBox(msg, title)
             return 0
@@ -73,10 +75,11 @@ def run(context):
 
         links_xyz_dict = {}
 
+
         # --------------------
         # Generate URDF
-        Write.write_urdf(joints_dict, links_xyz_dict, inertial_dict, package_name, robot_name, save_dir)
-        Write.write_materials_xacro(joints_dict, links_xyz_dict, inertial_dict, package_name, robot_name, save_dir)
+        Write.write_urdf(joints_dict, links_xyz_dict, inertial_dict, package_name, robot_name, save_dir, links_colors_dict)
+        Write.write_materials_xacro(joints_dict, links_xyz_dict, inertial_dict, package_name, robot_name, save_dir, colors_dict)
         Write.write_transmissions_xacro(joints_dict, links_xyz_dict, inertial_dict, package_name, robot_name, save_dir)
         Write.write_gazebo_xacro(joints_dict, links_xyz_dict, inertial_dict, package_name, robot_name, save_dir)
         Write.write_display_launch(package_name, robot_name, save_dir)
