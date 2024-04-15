@@ -48,37 +48,39 @@ class Link:
         """
         
         link = Element('link')
-        link.attrib = {'name':self.name}
+        link.attrib = {'name': "${prefix}" + self.name}
         
-        #inertial
-        inertial = SubElement(link, 'inertial')
-        origin_i = SubElement(inertial, 'origin')
-        origin_i.attrib = {'xyz':' '.join([str(_) for _ in self.center_of_mass]), 'rpy':'0 0 0'}       
-        mass = SubElement(inertial, 'mass')
-        mass.attrib = {'value':str(self.mass)}
-        inertia = SubElement(inertial, 'inertia')
-        inertia.attrib = \
-            {'ixx':str(self.inertia_tensor[0]), 'iyy':str(self.inertia_tensor[1]),\
-            'izz':str(self.inertia_tensor[2]), 'ixy':str(self.inertia_tensor[3]),\
-            'iyz':str(self.inertia_tensor[4]), 'ixz':str(self.inertia_tensor[5])}        
-        
-        # visual
-        visual = SubElement(link, 'visual')
-        origin_v = SubElement(visual, 'origin')
-        origin_v.attrib = {'xyz':' '.join([str(_) for _ in self.xyz]), 'rpy':'0 0 0'}
-        geometry_v = SubElement(visual, 'geometry')
-        mesh_v = SubElement(geometry_v, 'mesh')
-        mesh_v.attrib = {'filename':'file://' + '$(find %s)' % self.pkg_name + self.remain_repo_addr + self.name + '.stl','scale':'0.001 0.001 0.001'}
-        material = SubElement(visual, 'material')
-        material.attrib = {'name':'silver'}
-        
-        # collision
-        collision = SubElement(link, 'collision')
-        origin_c = SubElement(collision, 'origin')
-        origin_c.attrib = {'xyz':' '.join([str(_) for _ in self.xyz]), 'rpy':'0 0 0'}
-        geometry_c = SubElement(collision, 'geometry')
-        mesh_c = SubElement(geometry_c, 'mesh')
-        mesh_c.attrib = {'filename':'file://' + '$(find %s)' % self.pkg_name + self.remain_repo_addr + self.name + '.stl','scale':'0.001 0.001 0.001'}
+        if self.name != 'base_link':
+            #inertial
+            inertial = SubElement(link, 'inertial')
+            origin_i = SubElement(inertial, 'origin')
+            origin_i.attrib = {'xyz':' '.join([str(_) for _ in self.center_of_mass]), 'rpy':'0 0 0'}       
+            mass = SubElement(inertial, 'mass')
+            mass.attrib = {'value':str(self.mass)}
+            inertia = SubElement(inertial, 'inertia')
+            inertia.attrib = \
+                {'ixx':str(self.inertia_tensor[0]), 'iyy':str(self.inertia_tensor[1]),\
+                'izz':str(self.inertia_tensor[2]), 'ixy':str(self.inertia_tensor[3]),\
+                'iyz':str(self.inertia_tensor[4]), 'ixz':str(self.inertia_tensor[5])}        
+            
+            # visual
+            visual = SubElement(link, 'visual')
+            origin_v = SubElement(visual, 'origin')
+            origin_v.attrib = {'xyz':' '.join([str(_) for _ in self.xyz]), 'rpy':'0 0 0'}
+            geometry_v = SubElement(visual, 'geometry')
+            mesh_v = SubElement(geometry_v, 'mesh')
+            # mesh_v.attrib = {'filename':'file://' + '$(find %s)' % self.pkg_name + self.remain_repo_addr + self.name + '.stl','scale':'0.001 0.001 0.001'}
+            mesh_v.attrib = {'filename':'package://%s' % self.pkg_name + self.remain_repo_addr + self.name + '.stl','scale':'0.001 0.001 0.001'}
+            material = SubElement(visual, 'material')
+            material.attrib = {'name':'silver'}
+            
+            # collision
+            collision = SubElement(link, 'collision')
+            origin_c = SubElement(collision, 'origin')
+            origin_c.attrib = {'xyz':' '.join([str(_) for _ in self.xyz]), 'rpy':'0 0 0'}
+            geometry_c = SubElement(collision, 'geometry')
+            mesh_c = SubElement(geometry_c, 'mesh')
+            mesh_c.attrib = {'filename':'package://%s' % self.pkg_name + self.remain_repo_addr + self.name + '.stl','scale':'0.001 0.001 0.001'}
 
         # print("\n".join(utils.prettify(link).split("\n")[1:]))
         self.link_xml = "\n".join(utils.prettify(link).split("\n")[1:])

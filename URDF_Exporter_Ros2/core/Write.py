@@ -115,6 +115,7 @@ def write_gazebo_endtag(file_name):
         urdf full path
     """
     with open(file_name, mode='a') as f:
+        f.write('</xacro:macro>\n')
         f.write('</robot>\n')
 
 
@@ -122,11 +123,13 @@ def write_urdf(joints_dict, links_xyz_dict, inertial_dict, package_name, robot_n
     try: os.mkdir(save_dir + '/urdf')
     except: pass
 
-    file_name = save_dir + '/urdf/' + robot_name + '.xacro'  # the name of urdf file
+    file_name = save_dir + '/urdf/' + robot_name + '_macro.urdf.xacro'  # the name of urdf file
     repo = package_name + '/meshes/'  # the repository of binary stl files
     with open(file_name, mode='w') as f:
         f.write('<?xml version="1.0" ?>\n')
         f.write('<robot name="{}" xmlns:xacro="http://www.ros.org/wiki/xacro">\n'.format(robot_name))
+        f.write('\n')
+        f.write('<xacro:macro name="{}" params="prefix">\n'.format(robot_name))
         f.write('\n')
         f.write('<xacro:include filename="$(find {})/urdf/materials.xacro" />'.format(package_name))
         f.write('\n')

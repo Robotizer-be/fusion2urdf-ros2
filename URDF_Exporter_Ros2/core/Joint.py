@@ -47,14 +47,14 @@ class Joint:
         Generate the joint_xml and hold it by self.joint_xml
         """
         joint = Element('joint')
-        joint.attrib = {'name':self.name, 'type':self.type}
+        joint.attrib = {'name': "${prefix}" + self.name, 'type':self.type}
         
         origin = SubElement(joint, 'origin')
         origin.attrib = {'xyz':' '.join([str(_) for _ in self.xyz]), 'rpy':'0 0 0'}
         parent = SubElement(joint, 'parent')
-        parent.attrib = {'link':self.parent}
+        parent.attrib = {'link': "${prefix}" + self.parent}
         child = SubElement(joint, 'child')
-        child.attrib = {'link':self.child}
+        child.attrib = {'link': "${prefix}" + self.child}
         if self.type == 'revolute' or self.type == 'continuous' or self.type == 'prismatic':        
             axis = SubElement(joint, 'axis')
             axis.attrib = {'xyz':' '.join([str(_) for _ in self.axis])}
@@ -78,7 +78,7 @@ class Joint:
         """        
         
         tran = Element('transmission')
-        tran.attrib = {'name':self.name + '_tran'}
+        tran.attrib = {'name': "${prefix}" + self.name + '_tran'}
         
         joint_type = SubElement(tran, 'type')
         joint_type.text = 'transmission_interface/SimpleTransmission'
