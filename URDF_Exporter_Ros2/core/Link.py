@@ -112,7 +112,7 @@ def make_inertial_dict(root, msg, colors_dict, links_colors_dict, ui, design):
         occs_dict = {}
         prop = occs.getPhysicalProperties(adsk.fusion.CalculationAccuracy.VeryHighCalculationAccuracy)
         
-        occs_dict['name'] = re.sub('[ :()]', '_', occs.name.split(" ", 1)[0])
+        occs_dict['name'] = re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])
 
         mass = prop.mass  # kg
         occs_dict['mass'] = mass
@@ -127,7 +127,7 @@ def make_inertial_dict(root, msg, colors_dict, links_colors_dict, ui, design):
         if occs.component.name == 'base_link':
             inertial_dict['base_link'] = occs_dict
         else:
-            inertial_dict[re.sub('[ :()]', '_', occs.name.split(" ", 1)[0])] = occs_dict
+            inertial_dict[re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])] = occs_dict
             if occs.bRepBodies.count > 0:
                 appearance = occs.bRepBodies[0].appearance
                 color = None
@@ -143,12 +143,12 @@ def make_inertial_dict(root, msg, colors_dict, links_colors_dict, ui, design):
                     try:
                         existing_color = [a[0] for a in colors_dict.items() if a[1] and a[1][0] == color.value.red and a[1][1] == color.value.green and a[1][2] == color.value.blue][0]
                         if existing_color:
-                            links_colors_dict[re.sub('[ :()]', '_', occs.name.split(" ", 1)[0])] = existing_color
+                            links_colors_dict[re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])] = existing_color
                     except:
                         # generate random name
                         new_color_name = 'color' + str(len(colors_dict))
                         colors_dict[new_color_name] = [color.value.red, color.value.green, color.value.blue]
-                        links_colors_dict[re.sub('[ :()]', '_', occs.name.split(" ", 1)[0])] = new_color_name
+                        links_colors_dict[re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])] = new_color_name
                     # ui.messageBox("r = {0}, g = {1}, b = {2}".format(color.value.red, color.value.green, color.value.blue))
 
     return inertial_dict, msg, colors_dict, links_colors_dict

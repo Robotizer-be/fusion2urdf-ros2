@@ -33,7 +33,7 @@ def copy_occs(root):
             occs.component.name = 'old_component'
             new_occs.component.name = 'base_link'
         else:
-            new_occs.component.name = re.sub('[ :()]', '_', occs.name.split(" ", 1)[0])
+            new_occs.component.name = re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])
         new_occs = allOccs.item((allOccs.count-1))
         for i in range(bodies.count):
             body = bodies.item(i)
