@@ -39,7 +39,7 @@ def write_link_urdf(joints_dict, repo, links_xyz_dict, file_name, inertial_dict,
         link = Link.Link(name='base_link', xyz=[0,0,0],
             center_of_mass=center_of_mass, repo=repo,
             mass=inertial_dict['base_link']['mass'],
-            inertia_tensor=inertial_dict['base_link']['inertia'], color=robot_name + "_silver")
+            inertia_tensor=inertial_dict['base_link']['inertia'], material_name=robot_name + "_silver")
         links_xyz_dict[link.name] = link.xyz
         link.make_link_xml()
         f.write(link.link_xml)
@@ -53,7 +53,7 @@ def write_link_urdf(joints_dict, repo, links_xyz_dict, file_name, inertial_dict,
             link = Link.Link(name=name, xyz=joints_dict[joint]['xyz'],\
                 center_of_mass=center_of_mass,\
                 repo=repo, mass=inertial_dict[name]['mass'],\
-                inertia_tensor=inertial_dict[name]['inertia'], color=robot_name + "_" + (link_colors_dict[name] if name in link_colors_dict else 'silver'))
+                inertia_tensor=inertial_dict[name]['inertia'], material_name=robot_name + "_" + (link_colors_dict[name] if name in link_colors_dict else 'silver'))
             links_xyz_dict[link.name] = link.xyz
             link.make_link_xml()
             f.write(link.link_xml)
@@ -157,7 +157,7 @@ def write_materials_xacro(joints_dict, links_xyz_dict, inertial_dict, package_na
         f.write('\n')
         for color in colors_dict:
             f.write('<material name="{}_{}">\n'.format(robot_name, color))
-            f.write('  <color rgba="{} {} {} 1.000"/>\n'.format(colors_dict[color][0] / 255, colors_dict[color][1] / 255, colors_dict[color][2] / 255))
+            f.write('  <color rgba="{}"/>\n'.format(colors_dict[color]))
             f.write('</material>\n')
             f.write('\n')
         f.write('</robot>\n')
