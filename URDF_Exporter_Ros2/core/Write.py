@@ -85,8 +85,8 @@ def write_joint_urdf(joints_dict, repo, links_xyz_dict, file_name):
             upper_limit = joints_dict[j]['upper_limit']
             lower_limit = joints_dict[j]['lower_limit']
             try:
-                xyz = [round(c-p, 6) for p, c in \
-                    zip(links_xyz_dict[parent], links_xyz_dict[child])]  # xyz = child - parent
+                xyz = [round(c, 6) for p, c in \
+                    zip(links_xyz_dict[parent], links_xyz_dict[child])]  # xyz = child - parent => Just use child 
             except KeyError as ke:
                 app = adsk.core.Application.get()
                 ui = app.userInterface
@@ -192,8 +192,8 @@ def write_transmissions_xacro(joints_dict, links_xyz_dict, inertial_dict, packag
             upper_limit = joints_dict[j]['upper_limit']
             lower_limit = joints_dict[j]['lower_limit']
             try:
-                xyz = [round(p-c, 6) for p, c in \
-                    zip(links_xyz_dict[parent], links_xyz_dict[child])]  # xyz = parent - child
+                xyz = [round(c, 6) for c in links_xyz_dict[child]] # [round(p-c, 6) for p, c in \
+                #    zip(links_xyz_dict[parent], links_xyz_dict[child])]  # xyz = parent - child
             except KeyError as ke:
                 app = adsk.core.Application.get()
                 ui = app.userInterface

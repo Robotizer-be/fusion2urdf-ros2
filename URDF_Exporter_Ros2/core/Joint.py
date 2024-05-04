@@ -204,27 +204,28 @@ def make_joints_dict(root, msg):
             xyz_of_one            = joint.occurrenceOne.transform.translation.asArray() # Link origin
             xyz_of_two            = joint.occurrenceTwo.transform.translation.asArray() # Link origin
             M_one = joint.occurrenceOne.transform.asArray() # Matrix as a 16 element array.
+            M_two = joint.occurrenceTwo.transform.asArray() # Matrix as a 16 element array.
 
         # Compose joint position
             case1 = allclose(xyz_from_two_to_joint, xyz_from_one_to_joint)
             case2 = allclose(xyz_from_two_to_joint, xyz_of_one)
+            case2 = allclose(xyz_of_one, xyz_of_two)
             if case1 or case2:
                 xyz_of_joint = xyz_from_two_to_joint
             else:
-                xyz_of_joint = trans(M_one, xyz_from_two_to_joint)
-
+                xyz_of_joint = [p - c for p, c in zip(xyz_from_one_to_joint,trans(M_two, xyz_from_two_to_joint))]
 
             joint_dict['xyz'] = [round(i / 100.0, 6) for i in xyz_of_joint]  # converted to meter
 
-        except:
-            try:
-                if type(joint.geometryOrOriginTwo)==adsk.fusion.JointOrigin:
-                    data = joint.geometryOrOriginTwo.geometry.origin.asArray()
-                else:
-                    data = joint.geometryOrOriginTwo.origin.asArray()
-                joint_dict['xyz'] = [round(i / 100.0, 6) for i in data]  # converted to meter
-            except:
-                msg = joint.name + " doesn't have joint origin. Please set it and run again."
+        except Exception as e:
+            # try:
+            #     if type(joint.geometryOrOriginTwo)==adsk.fusion.JointOrigin:
+            #         data = joint.geometryOrOriginTwo.geometry.origin.asArray()
+            #     else:
+            #         data = joint.geometryOrOriginTwo.origin.asArray()
+            #     joint_dict['xyz'] = [round(i / 100.0, 6) for i in data]  # converted to meter
+            # except:
+                msg = joint.name + " doesn't have joint origin. Please set it and run again." + str(e)
                 break
         
         joints_dict[joint.name] = joint_dict
