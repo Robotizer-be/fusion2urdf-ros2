@@ -133,7 +133,7 @@ def make_inertial_dict(root, msg, colors_dict, links_colors_dict, ui, design):
                 for body in occs.bRepBodies:
                     color = body.appearance.appearanceProperties.itemByName('Color')
                     if color and (color.value.red != 255 or color.value.green != 255 or color.value.blue != 255):
-                        colorValue = f"{str(round(color.value.red/255,3))} {str(round(color.value.green/255,3))} {str(round(color.value.blue/255,3))} {str(round((color.value.opacity if color.value.opacity > 10 else 25)/255,3))}" # avoid 0 opacity
+                        colorValue = f"{str(round(color.value.red/255,3))} {str(round(color.value.green/255,3))} {str(round(color.value.blue/255,3))} {str(round((color.value.opacity if color.value.opacity > 10 else 25)/255,3))}"
                         try:
                             existing_color = [a[0] for a in colors_dict.items() if a[1] and a[1] == colorValue][0]
                             if existing_color:

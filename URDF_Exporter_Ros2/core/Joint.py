@@ -203,7 +203,7 @@ def make_joints_dict(root, msg):
             xyz_from_two_to_joint = joint.geometryOrOriginTwo.origin.asArray() # Relative Joint pos
             xyz_of_one            = joint.occurrenceOne.transform.translation.asArray() # Link origin
             xyz_of_two            = joint.occurrenceTwo.transform.translation.asArray() # Link origin
-            M_two = joint.occurrenceTwo.transform.asArray() # Matrix as a 16 element array.
+            M_one = joint.occurrenceOne.transform.asArray() # Matrix as a 16 element array.
 
         # Compose joint position
             case1 = allclose(xyz_from_two_to_joint, xyz_from_one_to_joint)
@@ -211,7 +211,7 @@ def make_joints_dict(root, msg):
             if case1 or case2:
                 xyz_of_joint = xyz_from_two_to_joint
             else:
-                xyz_of_joint = trans(M_two, xyz_from_two_to_joint)
+                xyz_of_joint = trans(M_one, xyz_from_two_to_joint)
 
 
             joint_dict['xyz'] = [round(i / 100.0, 6) for i in xyz_of_joint]  # converted to meter

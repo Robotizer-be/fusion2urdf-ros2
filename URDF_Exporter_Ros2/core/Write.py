@@ -54,7 +54,7 @@ def write_link_urdf(joints_dict, repo, links_xyz_dict, file_name, inertial_dict,
                 center_of_mass=center_of_mass,\
                 repo=repo, mass=inertial_dict[name]['mass'],\
                 inertia_tensor=inertial_dict[name]['inertia'], material_name=robot_name + "_" + (link_colors_dict[name] if name in link_colors_dict else 'silver'))
-            links_xyz_dict[link.name] = link.xyz
+            links_xyz_dict[link.name] = joints_dict[joint]['xyz'] # do not use the inverted distance from Link
             link.make_link_xml()
             f.write(link.link_xml)
             f.write('\n')
@@ -85,8 +85,8 @@ def write_joint_urdf(joints_dict, repo, links_xyz_dict, file_name):
             upper_limit = joints_dict[j]['upper_limit']
             lower_limit = joints_dict[j]['lower_limit']
             try:
-                xyz = [round(p-c, 6) for p, c in \
-                    zip(links_xyz_dict[parent], links_xyz_dict[child])]  # xyz = parent - child
+                xyz = [round(c-p, 6) for p, c in \
+                    zip(links_xyz_dict[parent], links_xyz_dict[child])]  # xyz = child - parent
             except KeyError as ke:
                 app = adsk.core.Application.get()
                 ui = app.userInterface
