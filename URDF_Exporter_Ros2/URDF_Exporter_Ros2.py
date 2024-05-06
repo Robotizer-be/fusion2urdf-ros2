@@ -92,7 +92,7 @@ def run(context):
         utils.update_package_xml(save_dir, package_name)
 
         # Generate STl files
-        utils.copy_occs(root)
+        utils.copy_occs(root, links_xyz_dict)
         utils.export_stl(design, save_dir, components)
 
         ui.messageBox(msg, title)

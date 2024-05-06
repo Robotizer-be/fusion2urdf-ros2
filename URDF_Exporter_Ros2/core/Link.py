@@ -32,7 +32,7 @@ class Link:
         """
         self.name = name
         # xyz for visual
-        self.xyz = [-_ for _ in xyz]  # reverse the sign of xyz
+        self.xyz = [0, 0, 0] # [-_ for _ in xyz]  # reverse the sign of xyz
         # xyz for center of mass
         self.center_of_mass = center_of_mass
         self.link_xml = None

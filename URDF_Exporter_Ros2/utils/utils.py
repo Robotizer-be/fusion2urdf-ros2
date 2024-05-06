@@ -13,7 +13,7 @@ from distutils.dir_util import copy_tree
 import fileinput
 import sys
 
-def copy_occs(root):
+def copy_occs(root, links_xyz_dict):
     """
     duplicate all the components
     """
@@ -24,6 +24,8 @@ def copy_occs(root):
 
         bodies = occs.bRepBodies
         transform = adsk.core.Matrix3D.create()
+        name = re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])
+        transform.translation = adsk.core.Vector3D.create(links_xyz_dict[name][0] * 100, links_xyz_dict[name][1]* 100, links_xyz_dict[name][2]* 100)
 
         # Create new components from occs
         # This support even when a component has some occses.
@@ -38,6 +40,7 @@ def copy_occs(root):
         for i in range(bodies.count):
             body = bodies.item(i)
             body.copyToComponent(new_occs)
+        
 
     allOccs = root.occurrences
     oldOccs = []
