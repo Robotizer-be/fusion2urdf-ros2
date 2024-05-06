@@ -211,20 +211,20 @@ def make_joints_dict(root, msg):
             if case1 or case2:
                 xyz_of_joint = xyz_from_two_to_joint
             else:
-                xyz_of_joint = trans(M_one, xyz_from_two_to_joint)
+                xyz_of_joint = xyz_from_one_to_joint # trans(M_one, xyz_from_two_to_joint)
 
 
             joint_dict['xyz'] = [round(i / 100.0, 6) for i in xyz_of_joint]  # converted to meter
 
-        except:
-            try:
-                if type(joint.geometryOrOriginTwo)==adsk.fusion.JointOrigin:
-                    data = joint.geometryOrOriginTwo.geometry.origin.asArray()
-                else:
-                    data = joint.geometryOrOriginTwo.origin.asArray()
-                joint_dict['xyz'] = [round(i / 100.0, 6) for i in data]  # converted to meter
-            except:
-                msg = joint.name + " doesn't have joint origin. Please set it and run again."
+        except Exception as e:
+            # try:
+            #     if type(joint.geometryOrOriginTwo)==adsk.fusion.JointOrigin:
+            #         data = joint.geometryOrOriginTwo.geometry.origin.asArray()
+            #     else:
+            #         data = joint.geometryOrOriginTwo.origin.asArray()
+            #     joint_dict['xyz'] = [round(i / 100.0, 6) for i in data]  # converted to meter
+            # except:
+                msg = joint.name + " doesn't have joint origin. Please set it and run again." + str(e)
                 break
         
         joints_dict[joint.name] = joint_dict
