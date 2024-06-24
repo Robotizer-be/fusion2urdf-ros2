@@ -258,7 +258,10 @@ def make_joints_dict(root, msg):
             M_two = (
                 joint.occurrenceTwo.transform.asArray()
             )  # Matrix as a 16 element array.
-            if joint_type != "fixed":
+            M_one = (
+                joint.occurrenceOne.transform.asArray()
+            )  # Matrix as a 16 element array.
+            if joint_type == "revolute":
                 # Compose joint position
                 case1 = allclose(xyz_from_two_to_joint, xyz_from_one_to_joint)
                 case2 = allclose(xyz_from_two_to_joint, xyz_of_one)
@@ -270,11 +273,13 @@ def make_joints_dict(root, msg):
                 joint_dict["xyz"] = [
                     round(i / 100.0, 6) for i in xyz_of_joint
                 ]  # converted to meter
+            # elif joint_type == 'prismatic' or joint_type == "fixed":
             else:
                 joint_dict["xyz"] = [
-                    round((one - two) / 100.0, 6)
-                    for one, two in zip(xyz_of_one, xyz_of_two)
+                    round(i / 100.0, 6) for i in xyz_from_one_to_joint
                 ]  # converted to meter
+            # else:
+            #     joint_dict['xyz'] = [round((one - two) / 100.0, 6) for one, two in zip(xyz_from_one_to_joint ,xyz_from_two_to_joint)]  # converted to meter
 
         except Exception as e:
             # try:
