@@ -1,5 +1,5 @@
-#Author-syuntoku14
-#Description-Generate URDF file from Fusion 360
+# Author-syuntoku14
+# Description-Generate URDF file from Fusion 360
 
 import adsk, adsk.core, adsk.fusion, traceback
 import os
@@ -18,9 +18,10 @@ from .core import Link, Joint, Write
 
 # I'm not sure how prismatic joint acts if there is no limit in fusion model
 
+
 def run(context):
     ui = None
-    success_msg = 'Successfully create URDF file'
+    success_msg = "Successfully create URDF file"
     msg = success_msg
 
     try:
@@ -30,9 +31,9 @@ def run(context):
         ui = app.userInterface
         product = app.activeProduct
         design = adsk.fusion.Design.cast(product)
-        title = 'Fusion2URDF'
+        title = "Fusion2URDF"
         if not design:
-            ui.messageBox('No active Fusion design', title)
+            ui.messageBox("No active Fusion design", title)
             return
 
         root = design.rootComponent  # root component
@@ -40,17 +41,19 @@ def run(context):
 
         # set the names
         robot_name = root.name.split()[0]
-        package_name = robot_name + '_description'
+        package_name = robot_name + "_description"
         save_dir = utils.file_dialog(ui)
         if save_dir == False:
-            ui.messageBox('Fusion2URDF was canceled', title)
+            ui.messageBox("Fusion2URDF was canceled", title)
             return 0
 
-        save_dir = save_dir + '/' + package_name
-        try: os.mkdir(save_dir)
-        except: pass
+        save_dir = save_dir + "/" + package_name
+        try:
+            os.mkdir(save_dir)
+        except:
+            pass
 
-        package_dir = os.path.abspath(os.path.dirname(__file__)) + '/package/'
+        package_dir = os.path.abspath(os.path.dirname(__file__)) + "/package/"
 
         # --------------------
         # set dictionaries
@@ -64,24 +67,55 @@ def run(context):
         # Generate inertial_dict
         links_colors_dict = {}
         colors_dict = {}
-        inertial_dict, msg, colors_dict, links_colors_dict = Link.make_inertial_dict(root, msg, colors_dict, links_colors_dict, ui, design)
+        inertial_dict, msg, colors_dict, links_colors_dict = Link.make_inertial_dict(
+            root, msg, colors_dict, links_colors_dict, ui, design
+        )
         if msg != success_msg:
             ui.messageBox(msg, title)
             return 0
-        elif not 'base_link' in inertial_dict:
-            msg = 'There is no base_link. Please set base_link and run again.'
+        elif not "base_link" in inertial_dict:
+            msg = "There is no base_link. Please set base_link and run again."
             ui.messageBox(msg, title)
             return 0
 
         links_xyz_dict = {}
 
-
         # --------------------
         # Generate URDF
-        Write.write_urdf(joints_dict, links_xyz_dict, inertial_dict, package_name, robot_name, save_dir, links_colors_dict)
-        Write.write_materials_xacro(joints_dict, links_xyz_dict, inertial_dict, package_name, robot_name, save_dir, colors_dict)
-        Write.write_transmissions_xacro(joints_dict, links_xyz_dict, inertial_dict, package_name, robot_name, save_dir)
-        Write.write_gazebo_xacro(joints_dict, links_xyz_dict, inertial_dict, package_name, robot_name, save_dir)
+        Write.write_urdf(
+            joints_dict,
+            links_xyz_dict,
+            inertial_dict,
+            package_name,
+            robot_name,
+            save_dir,
+            links_colors_dict,
+        )
+        Write.write_materials_xacro(
+            joints_dict,
+            links_xyz_dict,
+            inertial_dict,
+            package_name,
+            robot_name,
+            save_dir,
+            colors_dict,
+        )
+        Write.write_transmissions_xacro(
+            joints_dict,
+            links_xyz_dict,
+            inertial_dict,
+            package_name,
+            robot_name,
+            save_dir,
+        )
+        Write.write_gazebo_xacro(
+            joints_dict,
+            links_xyz_dict,
+            inertial_dict,
+            package_name,
+            robot_name,
+            save_dir,
+        )
         Write.write_display_launch(package_name, robot_name, save_dir)
         Write.write_state_publisher_launch(package_name, robot_name, save_dir)
         Write.write_rviz_launch(package_name, robot_name, save_dir)
@@ -99,4 +133,4 @@ def run(context):
 
     except:
         if ui:
-            ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
+            ui.messageBox("Failed:\n{}".format(traceback.format_exc()))
