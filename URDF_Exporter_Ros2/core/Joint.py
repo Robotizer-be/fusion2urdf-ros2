@@ -205,8 +205,8 @@ def make_joints_dict(root, msg):
                     + "is not set its upper limit. Please set it and try again."
                 )
                 break
-        elif joint_type == "fixed":
-            pass
+        # elif joint_type == 'fixed':
+        #     pass
 
         if joint.occurrenceTwo.component.name == "base_link":
             joint_dict["parent"] = "base_link"
@@ -258,18 +258,23 @@ def make_joints_dict(root, msg):
             M_two = (
                 joint.occurrenceTwo.transform.asArray()
             )  # Matrix as a 16 element array.
+            if joint_type != "fixed":
+                # Compose joint position
+                case1 = allclose(xyz_from_two_to_joint, xyz_from_one_to_joint)
+                case2 = allclose(xyz_from_two_to_joint, xyz_of_one)
+                if case1 or case2:
+                    xyz_of_joint = xyz_from_two_to_joint
+                else:
+                    xyz_of_joint = trans(M_two, xyz_from_two_to_joint)
 
-            # Compose joint position
-            case1 = allclose(xyz_from_two_to_joint, xyz_from_one_to_joint)
-            case2 = allclose(xyz_from_two_to_joint, xyz_of_one)
-            if case1 or case2:
-                xyz_of_joint = xyz_from_two_to_joint
+                joint_dict["xyz"] = [
+                    round(i / 100.0, 6) for i in xyz_of_joint
+                ]  # converted to meter
             else:
-                xyz_of_joint = trans(M_two, xyz_from_two_to_joint)
-
-            joint_dict["xyz"] = [
-                round(i / 100.0, 6) for i in xyz_of_joint
-            ]  # converted to meter
+                joint_dict["xyz"] = [
+                    round((one - two) / 100.0, 6)
+                    for one, two in zip(xyz_of_one, xyz_of_two)
+                ]  # converted to meter
 
         except Exception as e:
             # try:
