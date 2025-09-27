@@ -8,14 +8,15 @@ Created on Sun May 12 20:17:17 2019
 import adsk, re
 from xml.etree.ElementTree import Element, SubElement
 from ..utils import utils
+from adsk.fusion import Component
 
 class Joint:
-    def __init__(self, name, xyz, axis, parent, child, joint_type, upper_limit, lower_limit):
+    def __init__(self, name, xyz, rpy, axis, parent, child, joint_type, upper_limit, lower_limit):
         """
         Attributes
         ----------
-        name: str
-            name of the joint
+            name: str
+                name of the joint
         type: str
             type of the joint(ex: rev)
         xyz: [x, y, z]
@@ -34,6 +35,7 @@ class Joint:
         self.name = name
         self.type = joint_type
         self.xyz = xyz
+        self.rpy = rpy
         self.parent = parent
         self.child = child
         self.joint_xml = None
@@ -50,7 +52,7 @@ class Joint:
         joint.attrib = {'name': "${prefix}" + self.name, 'type':self.type}
         
         origin = SubElement(joint, 'origin')
-        origin.attrib = {'xyz':' '.join([str(_) for _ in self.xyz]), 'rpy':'0 0 0'}
+        origin.attrib = {'xyz':' '.join([str(_) for _ in self.xyz]), 'rpy': ' '.join([str(_) for _ in self.rpy])}
         parent = SubElement(joint, 'parent')
         parent.attrib = {'link': "${prefix}" + self.parent}
         child = SubElement(joint, 'child')
@@ -98,7 +100,7 @@ class Joint:
         self.tran_xml = "\n".join(utils.prettify(tran).split("\n")[1:])
 
 
-def make_joints_dict(root, msg):
+def make_joints_dict(root: Component, msg):
     """
     joints_dict holds parent, axis and xyz informatino of the joints
     
@@ -166,20 +168,19 @@ def make_joints_dict(root, msg):
             elif not max_enabled and min_enabled:
                 msg = joint.name + 'is not set its upper limit. Please set it and try again.'
                 break
-        # elif joint_type == 'fixed':
-        #     pass
+        elif joint_type == 'fixed':
+            pass
         
-        if joint.occurrenceTwo.component.name == 'base_link':
+        if joint.occurrenceTwo is None: #.component.name == 'base_link':
             joint_dict['parent'] = 'base_link'
         else:
             joint_dict['parent'] = re.sub('[ :()]', '_', joint.occurrenceTwo.name.split(" ", 1)[0].split(":", 1)[0])
         joint_dict['child'] = re.sub('[ :()]', '_', joint.occurrenceOne.name.split(" ", 1)[0].split(":", 1)[0])
-        
-        
-        #There seem to be a problem with geometryOrOriginTwo. To calcualte the correct orogin of the generated stl files following approach was used.
-        #https://forums.autodesk.com/t5/fusion-360-api-and-scripts/difference-of-geometryororiginone-and-geometryororiginonetwo/m-p/9837767
-        #Thanks to Masaki Yamamoto!
-        
+
+        # There seem to be a problem with geometryOrOriginTwo. To calcualte the correct orogin of the generated stl files following approach was used.
+        # https://forums.autodesk.com/t5/fusion-360-api-and-scripts/difference-of-geometryororiginone-and-geometryororiginonetwo/m-p/9837767
+        # Thanks to Masaki Yamamoto!
+
         # Coordinate transformation by matrix
         # M: 4x4 transformation matrix
         # a: 3D vector
@@ -198,41 +199,91 @@ def make_joints_dict(root, msg):
         def allclose(v1, v2, tol=1e-6):
             return( max([abs(a-b) for a,b in zip(v1, v2)]) < tol )
 
+        # try:
+        #     # Basic information
+        #     xyz_from_one_to_joint = joint.geometryOrOriginOne.origin.asArray() # Relative Joint pos
+        #     xyz_from_two_to_joint = joint.geometryOrOriginTwo.origin.asArray() # Relative Joint pos
+        #     xyz_of_one            = joint.occurrenceOne.transform.translation.asArray() # Link origin
+        #     xyz_of_two            = joint.occurrenceTwo.transform.translation.asArray() # Link origin
+        #     M_two = joint.occurrenceTwo.transform.asArray() # Matrix as a 16 element array.
+        #     M_one = joint.occurrenceOne.transform.asArray() # Matrix as a 16 element array.
+        #     if joint_type == 'revolute':
+        #         # Compose joint position
+        #         case1 = allclose(xyz_from_two_to_joint, xyz_from_one_to_joint)
+        #         case2 = allclose(xyz_from_two_to_joint, xyz_of_one)
+        #         if case1 or case2:
+        #             xyz_of_joint = xyz_from_two_to_joint
+        #         else:
+        #             xyz_of_joint = trans(M_two, xyz_from_two_to_joint)
+
+        #         joint_dict['xyz'] = [round(i / 100.0, 6) for i in xyz_of_joint]  # converted to meter
+        #     # elif joint_type == 'prismatic' or joint_type == "fixed":
+        #     else:
+        #         joint_dict['xyz'] = [round(i / 100.0, 6) for i in xyz_from_one_to_joint]  # converted to meter
+        #     # else:
+        #     #     joint_dict['xyz'] = [round((one - two) / 100.0, 6) for one, two in zip(xyz_from_one_to_joint ,xyz_from_two_to_joint)]  # converted to meter
+                
+
+        # except Exception as e:
+        #     # try:
+        #     #     if type(joint.geometryOrOriginTwo)==adsk.fusion.JointOrigin:
+        #     #         data = joint.geometryOrOriginTwo.geometry.origin.asArray()
+        #     #     else:
+        #     #         data = joint.geometryOrOriginTwo.origin.asArray()
+        #     #     joint_dict['xyz'] = [round(i / 100.0, 6) for i in data]  # converted to meter
+        #     # except:
+        #         msg = joint.name + " doesn't have joint origin. Please set it and run again." + str(e)
+        #         break
+        
+        
         try:
-            # Basic information
             xyz_from_one_to_joint = joint.geometryOrOriginOne.origin.asArray() # Relative Joint pos
             xyz_from_two_to_joint = joint.geometryOrOriginTwo.origin.asArray() # Relative Joint pos
             xyz_of_one            = joint.occurrenceOne.transform.translation.asArray() # Link origin
             xyz_of_two            = joint.occurrenceTwo.transform.translation.asArray() # Link origin
             M_two = joint.occurrenceTwo.transform.asArray() # Matrix as a 16 element array.
-            M_one = joint.occurrenceOne.transform.asArray() # Matrix as a 16 element array.
-            if joint_type == 'revolute':
-                # Compose joint position
-                case1 = allclose(xyz_from_two_to_joint, xyz_from_one_to_joint)
-                case2 = allclose(xyz_from_two_to_joint, xyz_of_one)
-                if case1 or case2:
-                    xyz_of_joint = xyz_from_two_to_joint
-                else:
-                    xyz_of_joint = trans(M_two, xyz_from_two_to_joint)
+            
 
-                joint_dict['xyz'] = [round(i / 100.0, 6) for i in xyz_of_joint]  # converted to meter
-            # elif joint_type == 'prismatic' or joint_type == "fixed":
-            else:
-                joint_dict['xyz'] = [round(i / 100.0, 6) for i in xyz_from_one_to_joint]  # converted to meter
+            # if joint_dict['child'] == 'divider':
+            #     msg = f'{xyz_from_one_to_joint}, {xyz_from_two_to_joint}, {xyz_of_one}, {xyz_of_two}, {M_two}'
+            #     break
+            # xyz_of_joint = [one - two for one, two in zip(xyz_from_one_to_joint ,xyz_from_two_to_joint)] 
+            
+            # roll, pitch, yaw = utils.get_rpy_from_matrix(M_two)
+        # Compose joint position
+            # case1 = allclose(xyz_from_two_to_joint, xyz_from_one_to_joint)
+            # case2 = allclose(xyz_from_two_to_joint, xyz_of_one)
+            # case3 = allclose(xyz_of_one, xyz_of_two)
+            # if case1 and case2 and case3:
+            #     xyz_of_joint = [0,0,0]
+            # # elif case1 or case2:
+            # #     xyz_of_joint = xyz_from_two_to_joint
             # else:
-            #     joint_dict['xyz'] = [round((one - two) / 100.0, 6) for one, two in zip(xyz_from_one_to_joint ,xyz_from_two_to_joint)]  # converted to meter
-                
+            #     xyz_of_joint = trans(M_two, xyz_of_one)
+            # # xyz_of_joint = trans(M_two, xyz_of_one)
+            # # xyz_of_joint =trans(M_two, xyz_of_one) xyz_from_two_to_joint
+            t1 = utils.list_to_matrix(joint.occurrenceOne.transform.asArray())
+            t2 = utils.list_to_matrix(joint.occurrenceTwo.transform.asArray())
+            transform = utils.relative_transform(t2, t1)
+            xyz_of_joint = [transform[0][3], transform[1][3], transform[2][3]]
+            roll, pitch, yaw = utils.get_rpy_from_matrix(utils.matrix_to_list(transform))
+
+
+            joint_dict['xyz'] = [round(i / 100.0, 6) for i in xyz_of_joint]  # converted to meter
+            joint_dict['rpy'] = [roll, pitch, yaw]  # roll pitch yaw
 
         except Exception as e:
-            # try:
-            #     if type(joint.geometryOrOriginTwo)==adsk.fusion.JointOrigin:
-            #         data = joint.geometryOrOriginTwo.geometry.origin.asArray()
-            #     else:
-            #         data = joint.geometryOrOriginTwo.origin.asArray()
-            #     joint_dict['xyz'] = [round(i / 100.0, 6) for i in data]  # converted to meter
-            # except:
-                msg = joint.name + " doesn't have joint origin. Please set it and run again." + str(e)
+            try:
+                if type(joint.geometryOrOriginTwo)==adsk.fusion.JointOrigin:
+                    data = joint.geometryOrOriginTwo.geometry.origin.asArray()
+                else:
+                    data = joint.geometryOrOriginTwo.origin.asArray()
+                joint_dict['xyz'] = [round(i / 100.0, 6) for i in data]  # converted to meter
+                joint_dict['rpy'] = [0, 0, 0]  # roll pitch yaw
+            except:
+                msg = joint.name + " doesn't have joint origin. Please set it and run again. " + str(e)
                 break
+        
         
         joints_dict[joint.name] = joint_dict
     return joints_dict, msg

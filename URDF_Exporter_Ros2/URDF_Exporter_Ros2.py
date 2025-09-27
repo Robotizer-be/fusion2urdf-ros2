@@ -61,6 +61,7 @@ def run(context):
             ui.messageBox(msg, title)
             return 0
 
+        # joints_dict['base_link'] = {'type':'fixed', 'parent':'base_link', 'child':'base_link', 'axis':[0,0,0], 'xyz':[0,0,0], 'rpy':[0,0,0], 'upper_limit': 0, 'lower_limit': 0}
         # Generate inertial_dict
         links_colors_dict = {}
         colors_dict = {}
@@ -74,14 +75,15 @@ def run(context):
             return 0
 
         links_xyz_dict = {}
+        links_rpy_dict = {}
 
 
         # --------------------
         # Generate URDF
-        Write.write_urdf(joints_dict, links_xyz_dict, inertial_dict, package_name, robot_name, save_dir, links_colors_dict)
-        Write.write_materials_xacro(joints_dict, links_xyz_dict, inertial_dict, package_name, robot_name, save_dir, colors_dict)
-        Write.write_transmissions_xacro(joints_dict, links_xyz_dict, inertial_dict, package_name, robot_name, save_dir)
-        Write.write_gazebo_xacro(joints_dict, links_xyz_dict, inertial_dict, package_name, robot_name, save_dir)
+        Write.write_urdf(joints_dict, links_xyz_dict, links_rpy_dict, inertial_dict, package_name, robot_name, save_dir, links_colors_dict)
+        Write.write_materials_xacro(joints_dict, links_xyz_dict, links_rpy_dict, inertial_dict, package_name, robot_name, save_dir, colors_dict)
+        Write.write_transmissions_xacro(joints_dict, links_xyz_dict, links_rpy_dict, inertial_dict, package_name, robot_name, save_dir)
+        Write.write_gazebo_xacro(joints_dict, links_xyz_dict, links_rpy_dict, inertial_dict, package_name, robot_name, save_dir)
         Write.write_display_launch(package_name, robot_name, save_dir)
         Write.write_state_publisher_launch(package_name, robot_name, save_dir)
         Write.write_rviz_launch(package_name, robot_name, save_dir)

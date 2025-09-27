@@ -11,7 +11,7 @@ from ..utils import utils
 import json 
 class Link:
 
-    def __init__(self, name, xyz, center_of_mass, repo, mass, inertia_tensor, material_name = 'silver'):
+    def __init__(self, name, xyz, rpy, center_of_mass, repo, mass, inertia_tensor, material_name = 'silver'):
         """
         Parameters
         ----------
@@ -33,6 +33,7 @@ class Link:
         self.name = name
         # xyz for visual
         self.xyz = [0, 0, 0] # [-_ for _ in xyz]  # reverse the sign of xyz
+        self.rpy = rpy  # roll pitch yaw
         # xyz for center of mass
         self.center_of_mass = center_of_mass
         self.link_xml = None
@@ -67,7 +68,7 @@ class Link:
             # visual
             visual = SubElement(link, 'visual')
             origin_v = SubElement(visual, 'origin')
-            origin_v.attrib = {'xyz':' '.join([str(_) for _ in self.xyz]), 'rpy':'0 0 0'}
+            origin_v.attrib = {'xyz':' '.join([str(_) for _ in self.xyz]), 'rpy':' '.join([str(_) for _ in self.rpy])}
             geometry_v = SubElement(visual, 'geometry')
             mesh_v = SubElement(geometry_v, 'mesh')
             # mesh_v.attrib = {'filename':'file://' + '$(find %s)' % self.pkg_name + self.remain_repo_addr + self.name + '.stl','scale':'0.001 0.001 0.001'}
@@ -78,7 +79,7 @@ class Link:
             # collision
             collision = SubElement(link, 'collision')
             origin_c = SubElement(collision, 'origin')
-            origin_c.attrib = {'xyz':' '.join([str(_) for _ in self.xyz]), 'rpy':'0 0 0'}
+            origin_c.attrib = {'xyz':' '.join([str(_) for _ in self.xyz]), 'rpy':' '.join([str(_) for _ in self.rpy])}
             geometry_c = SubElement(collision, 'geometry')
             mesh_c = SubElement(geometry_c, 'mesh')
             mesh_c.attrib = {'filename':'package://%s' % self.pkg_name + self.remain_repo_addr + self.name + '.stl','scale':'0.001 0.001 0.001'}
@@ -107,6 +108,8 @@ def make_inertial_dict(root, msg, colors_dict, links_colors_dict, ui, design):
     allOccs = root.occurrences
     inertial_dict = {}
     
+    # Add base_link
+    inertial_dict['base_link'] = {'mass':0.0, 'inertia':[0,0,0,0,0,0], 'center_of_mass':[0,0,0]}
     for occs in allOccs:
         # Skip the root component.
         occs_dict = {}

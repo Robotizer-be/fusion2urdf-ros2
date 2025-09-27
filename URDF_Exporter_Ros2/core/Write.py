@@ -10,7 +10,7 @@ from xml.etree.ElementTree import Element, SubElement
 from . import Link, Joint, launch_templates
 from ..utils import utils
 
-def write_link_urdf(joints_dict, repo, links_xyz_dict, file_name, inertial_dict, link_colors_dict, robot_name):
+def write_link_urdf(joints_dict, repo, links_xyz_dict, links_rpy_dict, file_name, inertial_dict, link_colors_dict, robot_name):
     """
     Write links information into urdf "repo/file_name"
 
@@ -36,7 +36,7 @@ def write_link_urdf(joints_dict, repo, links_xyz_dict, file_name, inertial_dict,
     with open(file_name, mode='a') as f:
         # for base_link
         center_of_mass = inertial_dict['base_link']['center_of_mass']
-        link = Link.Link(name='base_link', xyz=[0,0,0],
+        link = Link.Link(name='base_link', xyz=[0,0,0], rpy=[0,0,0], \
             center_of_mass=center_of_mass, repo=repo,
             mass=inertial_dict['base_link']['mass'],
             inertia_tensor=inertial_dict['base_link']['inertia'], material_name=robot_name + "_silver")
@@ -50,17 +50,17 @@ def write_link_urdf(joints_dict, repo, links_xyz_dict, file_name, inertial_dict,
             name = joints_dict[joint]['child']
             center_of_mass = \
                 [ i-j for i, j in zip(inertial_dict[name]['center_of_mass'], joints_dict[joint]['xyz'])]
-            link = Link.Link(name=name, xyz=joints_dict[joint]['xyz'],\
+            link = Link.Link(name=name, xyz=joints_dict[joint]['xyz'], rpy=[0,0,0], \
                 center_of_mass=center_of_mass,\
                 repo=repo, mass=inertial_dict[name]['mass'],\
                 inertia_tensor=inertial_dict[name]['inertia'], material_name=robot_name + "_" + (link_colors_dict[name] if name in link_colors_dict else 'silver'))
-            links_xyz_dict[link.name] = joints_dict[joint]['xyz'] # do not use the inverted distance from Link
+            links_xyz_dict[link.name] = link.xyz  # joints_dict[joint]['xyz'] # do not use the inverted distance from Link
             link.make_link_xml()
             f.write(link.link_xml)
             f.write('\n')
 
 
-def write_joint_urdf(joints_dict, repo, links_xyz_dict, file_name):
+def write_joint_urdf(joints_dict, repo, links_xyz_dict, links_rpy_dict, file_name):
     """
     Write joints and transmission information into urdf "repo/file_name"
 
@@ -85,8 +85,9 @@ def write_joint_urdf(joints_dict, repo, links_xyz_dict, file_name):
             upper_limit = joints_dict[j]['upper_limit']
             lower_limit = joints_dict[j]['lower_limit']
             try:
-                xyz = [round(c-p, 6) for p, c in \
-                    zip(links_xyz_dict[parent], links_xyz_dict[child])]  # xyz = child - parent
+                xyz = joints_dict[j]['xyz'] # [round(p-c, 6) for p, c in \
+                #    zip(links_xyz_dict[parent], links_xyz_dict[child])]  # xyz = child - parent
+                rpy = joints_dict[j]['rpy']
             except KeyError as ke:
                 app = adsk.core.Application.get()
                 ui = app.userInterface
@@ -96,7 +97,7 @@ to swap component1<=>component2"
                 % (parent, child, parent, child), "Error!")
                 quit()
 
-            joint = Joint.Joint(name=j, joint_type = joint_type, xyz=xyz, \
+            joint = Joint.Joint(name=j, joint_type = joint_type, xyz=xyz, rpy=rpy, \
             axis=joints_dict[j]['axis'], parent=parent, child=child, \
             upper_limit=upper_limit, lower_limit=lower_limit)
             joint.make_joint_xml()
@@ -119,7 +120,7 @@ def write_gazebo_endtag(file_name):
         f.write('</robot>\n')
 
 
-def write_urdf(joints_dict, links_xyz_dict, inertial_dict, package_name, robot_name, save_dir, link_colors_dict):
+def write_urdf(joints_dict, links_xyz_dict, links_rpy_dict, inertial_dict, package_name, robot_name, save_dir, link_colors_dict):
     try: os.mkdir(save_dir + '/urdf')
     except: pass
 
@@ -138,11 +139,11 @@ def write_urdf(joints_dict, links_xyz_dict, inertial_dict, package_name, robot_n
         f.write('<xacro:include filename="$(find {})/urdf/{}.gazebo" />'.format(package_name, robot_name))
         f.write('\n')
 
-    write_link_urdf(joints_dict, repo, links_xyz_dict, file_name, inertial_dict, link_colors_dict, robot_name)
-    write_joint_urdf(joints_dict, repo, links_xyz_dict, file_name)
+    write_link_urdf(joints_dict, repo, links_xyz_dict, links_rpy_dict, file_name, inertial_dict, link_colors_dict, robot_name)
+    write_joint_urdf(joints_dict, repo, links_xyz_dict, links_rpy_dict, file_name)
     write_gazebo_endtag(file_name)
 
-def write_materials_xacro(joints_dict, links_xyz_dict, inertial_dict, package_name, robot_name, save_dir, colors_dict):
+def write_materials_xacro(joints_dict, links_xyz_dict, links_rpy_dict, inertial_dict, package_name, robot_name, save_dir, colors_dict):
     try: os.mkdir(save_dir + '/urdf')
     except: pass
 
@@ -162,7 +163,7 @@ def write_materials_xacro(joints_dict, links_xyz_dict, inertial_dict, package_na
             f.write('\n')
         f.write('</robot>\n')
 
-def write_transmissions_xacro(joints_dict, links_xyz_dict, inertial_dict, package_name, robot_name, save_dir):
+def write_transmissions_xacro(joints_dict, links_xyz_dict, links_rpy_dict, inertial_dict, package_name, robot_name, save_dir):
     """
     Write joints and transmission information into urdf "repo/file_name"
 
@@ -203,7 +204,7 @@ to swap component1<=>component2"
                 % (parent, child, parent, child), "Error!")
                 quit()
 
-            joint = Joint.Joint(name=j, joint_type = joint_type, xyz=xyz, \
+            joint = Joint.Joint(name=j, joint_type = joint_type, xyz=xyz, rpy=[0,0,0], \
             axis=joints_dict[j]['axis'], parent=parent, child=child, \
             upper_limit=upper_limit, lower_limit=lower_limit)
             if joint_type != 'fixed':
@@ -213,7 +214,7 @@ to swap component1<=>component2"
 
         f.write('</robot>\n')
 
-def write_gazebo_xacro(joints_dict, links_xyz_dict, inertial_dict, package_name, robot_name, save_dir):
+def write_gazebo_xacro(joints_dict, links_xyz_dict, links_rpy_dict, inertial_dict, package_name, robot_name, save_dir):
     try: os.mkdir(save_dir + '/urdf')
     except: pass
 

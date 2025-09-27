@@ -6,6 +6,7 @@ Created on Sun May 12 19:15:34 2019
 """
 
 import adsk, adsk.core, adsk.fusion
+from adsk.fusion import Component, Occurrence
 import os.path, re
 from xml.etree import ElementTree
 from xml.dom import minidom
@@ -13,22 +14,26 @@ from shutil import copytree
 import fileinput
 import sys
 
-def copy_occs(root, links_xyz_dict):
+def copy_occs(root: Component, links_xyz_dict):
     """
     duplicate all the components
     """
-    def copy_body(allOccs, occs):
+    def copy_body(allOccs, occs: Occurrence):
         """
         copy the old occs to new component
         """
 
         bodies = occs.bRepBodies
-        transform = adsk.core.Matrix3D.create()
+        # origin = occs.transform.translation
+        # transform = adsk.core.Matrix3D.create()
         name = re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])
-        transform.translation = adsk.core.Vector3D.create(links_xyz_dict[name][0] * 100, links_xyz_dict[name][1]* 100, links_xyz_dict[name][2]* 100)
-
+        # Transform to origin position of body
+        transform = occs.transform.copy() # adsk.core.Vector3D.create(links_xyz_dict[name][0] * 100, links_xyz_dict[name][1]* 100, links_xyz_dict[name][2]* 100)
+        
         # Create new components from occs
         # This support even when a component has some occses.
+        
+        # add a new component with the same origin as
 
         new_occs = allOccs.addNewComponent(transform)  # this create new occs
         if occs.component.name == 'base_link':
@@ -80,7 +85,8 @@ def export_stl(design, save_dir, components):
             if 'old_component' not in occ.component.name:
                 try:
                     print(occ.component.name)
-                    fileName = scriptDir + "/" + occ.component.name
+                    name = re.sub('[ :()]', '_', occ.component.name.split(" ", 1)[0].split(":", 1)[0])
+                    fileName = scriptDir + "/" + name # occ.component.name
                     # create stl exportOptions
                     stlExportOptions = exportMgr.createSTLExportOptions(occ, fileName)
                     stlExportOptions.sendToPrintUtility = False
@@ -180,3 +186,73 @@ def update_package_xml(save_dir, package_name):
             sys.stdout.write("<description>The " + package_name + " package</description>\n")
         else:
             sys.stdout.write(line)
+    
+def get_rpy_from_matrix(M):
+    """
+    Get roll, pitch, yaw from a 4x4 transformation matrix
+
+    Parameters
+    ----------
+    M: list of float
+        16 elements of a 4x4 transformation matrix in row-major order
+
+    Returns
+    -------
+    roll, pitch, yaw: float
+        rotation in radian
+    """
+    import math
+    if abs(M[10]) != 1:
+        pitch = -math.asin(M[2])
+        roll = math.atan2(M[6]/math.cos(pitch), M[10]/math.cos(pitch))
+        yaw = math.atan2(M[1]/math.cos(pitch), M[0]/math.cos(pitch))
+    else:
+        yaw = 0 # can set to anything
+        if M[10] == -1:
+            pitch = math.pi/2
+            roll = yaw + math.atan2(M[4], M[8])
+        else:
+            pitch = -math.pi/2
+            roll = -yaw + math.atan2(-M[4], -M[8])
+    return [round(roll, 6), round(pitch, 6), round(yaw, 6)]
+
+def mat_mult(A, B):
+    """Multiply two 4x4 matrices A and B"""
+    result = [[0]*4 for _ in range(4)]
+    for i in range(4):
+        for j in range(4):
+            result[i][j] = sum(A[i][k] * B[k][j] for k in range(4))
+    return result
+
+def invert_transform(T):
+    """Invert a 4x4 homogeneous transform (rigid body only)"""
+    # Extract rotation (R) and translation (t)
+    R = [row[:3] for row in T[:3]]
+    t = [T[i][3] for i in range(3)]
+
+    # Transpose rotation
+    R_T = [[R[j][i] for j in range(3)] for i in range(3)]
+
+    # Compute -R^T * t
+    t_inv = [-sum(R_T[i][k] * t[k] for k in range(3)) for i in range(3)]
+
+    # Build inverse matrix
+    T_inv = [[0]*4 for _ in range(4)]
+    for i in range(3):
+        for j in range(3):
+            T_inv[i][j] = R_T[i][j]
+        T_inv[i][3] = t_inv[i]
+    T_inv[3][3] = 1
+    return T_inv
+
+def relative_transform(T1, T2):
+    """Compute T1^-1 * T2 without numpy"""
+    return mat_mult(invert_transform(T1), T2)
+
+def list_to_matrix(M_list):
+    """Convert a list of 16 elements to a 4x4 matrix"""
+    return [M_list[i*4:(i+1)*4] for i in range(4)]
+
+def matrix_to_list(M):
+    """Convert a 4x4 matrix to a list of 16 elements"""
+    return [M[i][j] for i in range(4) for j in range(4)]
