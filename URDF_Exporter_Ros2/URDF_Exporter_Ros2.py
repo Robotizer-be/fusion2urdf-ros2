@@ -56,7 +56,7 @@ def run(context):
         # set dictionaries
 
         # Generate joints_dict. All joints are related to root.
-        joints_dict, msg = Joint.make_joints_dict(root, msg)
+        joints_dict, links_dict, msg = Joint.make_joints_dict(root, msg)
         if msg != success_msg:
             ui.messageBox(msg, title)
             return 0
@@ -94,7 +94,7 @@ def run(context):
         utils.update_package_xml(save_dir, package_name)
 
         # Generate STl files
-        utils.copy_occs(root, links_xyz_dict)
+        utils.copy_occs(root, links_dict)
         utils.export_stl(design, save_dir, components)
 
         ui.messageBox(msg, title)

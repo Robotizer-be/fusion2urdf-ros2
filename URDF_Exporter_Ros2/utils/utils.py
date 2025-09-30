@@ -14,7 +14,7 @@ from shutil import copytree
 import fileinput
 import sys
 
-def copy_occs(root: Component, links_xyz_dict):
+def copy_occs(root: Component, links_dict):
     """
     duplicate all the components
     """
@@ -27,20 +27,39 @@ def copy_occs(root: Component, links_xyz_dict):
         # origin = occs.transform.translation
         # transform = adsk.core.Matrix3D.create()
         name = re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])
-        # Transform to origin position of body
-        transform = occs.transform.copy() # adsk.core.Vector3D.create(links_xyz_dict[name][0] * 100, links_xyz_dict[name][1]* 100, links_xyz_dict[name][2]* 100)
+        
+        # now transform from the origin of the body to the origin of the joint
         
         # Create new components from occs
         # This support even when a component has some occses.
         
-        # add a new component with the same origin as
+        try:
+            # Alternative approach: Create component without transform, then apply transform
+            # This avoids potential issues with addNewComponent and specific transform values
+            
+            # First, create the component with identity transform
 
-        new_occs = allOccs.addNewComponent(transform)  # this create new occs
+                
+            transform = adsk.core.Matrix3D.create()
+            if name in links_dict and 'transform_array' in links_dict[name]:
+                # Round matrix values to avoid floating-point precision issues
+                # Use 10 decimal places for 0.1mm precision (since Fusion works in cm: 0.1mm = 0.01cm)
+                clean_array = [round(val, 10) for val in links_dict[name]['transform_array']]
+                transform.setWithArray(clean_array)
+            new_occs = allOccs.addNewComponent(transform)
+        except Exception as e:
+            app = adsk.core.Application.get()
+            ui = app.userInterface
+            ui.messageBox(f"Failed to create component {name}: {str(e)}. {str(links_dict[name]['transform_array'])} {links_dict[name]['source_type']}")
+            return
+            
         if occs.component.name == 'base_link':
             occs.component.name = 'old_component'
             new_occs.component.name = 'base_link'
         else:
-            new_occs.component.name = re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])
+            name = re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])
+            occs.component.name = 'old_component'
+            new_occs.component.name = name
         new_occs = allOccs.item((allOccs.count-1))
         for i in range(bodies.count):
             body = bodies.item(i)
@@ -55,8 +74,8 @@ def copy_occs(root: Component, links_xyz_dict):
             copy_body(allOccs, occs)
             oldOccs.append(occs)
 
-    for occs in oldOccs:
-        occs.component.name = 'old_component'
+    # for occs in oldOccs:
+    #     occs.component.name = 'old_component'
 
 
 def export_stl(design, save_dir, components):
@@ -202,18 +221,27 @@ def get_rpy_from_matrix(M):
         rotation in radian
     """
     import math
-    if abs(M[10]) != 1:
-        pitch = -math.asin(M[2])
-        roll = math.atan2(M[6]/math.cos(pitch), M[10]/math.cos(pitch))
-        yaw = math.atan2(M[1]/math.cos(pitch), M[0]/math.cos(pitch))
-    else:
-        yaw = 0 # can set to anything
-        if M[10] == -1:
+    
+    # Extract rotation matrix elements (3x3 upper-left of 4x4 matrix)
+    # M is in row-major order: [M00, M01, M02, M03, M10, M11, M12, M13, M20, M21, M22, M23, M30, M31, M32, M33]
+    # So: M[0]=M00, M[1]=M01, M[2]=M02, M[4]=M10, M[5]=M11, M[6]=M12, M[8]=M20, M[9]=M21, M[10]=M22
+    
+    # Check for gimbal lock (when |M[8]| is close to 1, meaning |sin(pitch)| ≈ 1)
+    if abs(M[8]) >= 0.99999:  # M[8] is M20 (sin(-pitch))
+        # Gimbal lock case
+        yaw = 0  # can set to anything
+        if M[8] < 0:  # sin(-pitch) < 0, so pitch > 0
             pitch = math.pi/2
-            roll = yaw + math.atan2(M[4], M[8])
-        else:
+            roll = yaw + math.atan2(M[1], M[5])  # M[1]=M01, M[5]=M11
+        else:  # sin(-pitch) > 0, so pitch < 0
             pitch = -math.pi/2
-            roll = -yaw + math.atan2(-M[4], -M[8])
+            roll = -yaw + math.atan2(-M[1], M[5])  # M[1]=M01, M[5]=M11
+    else:
+        # Normal case (no gimbal lock)
+        pitch = math.asin(-M[8])  # M[8] is M20
+        roll = math.atan2(M[9]/math.cos(pitch), M[10]/math.cos(pitch))  # M[9]=M21, M[10]=M22
+        yaw = math.atan2(M[4]/math.cos(pitch), M[0]/math.cos(pitch))   # M[4]=M10, M[0]=M00
+    
     return [round(roll, 6), round(pitch, 6), round(yaw, 6)]
 
 def mat_mult(A, B):
