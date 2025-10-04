@@ -223,7 +223,7 @@ def write_urdf(
         )
         f.write("\n")
         f.write("</xacro:if>")
-        f.writex("\n\n")
+        f.write("\n\n")
 
     write_link_urdf(
         joints_dict,
