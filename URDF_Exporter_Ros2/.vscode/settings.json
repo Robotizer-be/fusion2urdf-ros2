@@ -1,6 +1,6 @@
 {
 	"python.autoComplete.extraPaths":	["/Users/jens/Library/Application Support/Autodesk/Autodesk Fusion 360/API/Python/defs"],
 	"python.analysis.extraPaths":	["/Users/jens/Library/Application Support/Autodesk/Autodesk Fusion 360/API/Python/defs"],
-	"python.defaultInterpreterPath": "/Users/jens/Library/Application Support/Autodesk/webdeploy/production/06ccf971b9987ed977778fcead551da5aa94cd13/Autodesk Fusion.app/Contents/Frameworks/Python.framework/Versions/Current/bin/python",
-	"idf.pythonInstallPath": "/opt/homebrew/opt/python@3.11/Frameworks/Python.framework/Versions/3.11/bin/python3"
+	"python.defaultInterpreterPath":	"/Users/jens/Library/Application Support/Autodesk/webdeploy/production/d33deb94f63c0f9e07daa3f1ea6a07e40d838e5e/Autodesk Fusion.app/Contents/Frameworks/Python.framework/Versions/Current/bin/python",
+	"idf.pythonInstallPath":	"/opt/homebrew/opt/python@3.11/Frameworks/Python.framework/Versions/3.11/bin/python3"
 }
