@@ -14,10 +14,11 @@ from shutil import copytree
 import fileinput
 import sys
 
-def copy_occs(root: Component, links_dict):
+def copy_occs(root: Component, links_dict, occupancy_name_map, allOccs=None):
     """
     duplicate all the components
     """
+    allready_added_linked_components = set()
     def copy_body(allOccs, occs: Occurrence):
         """
         copy the old occs to new component
@@ -26,8 +27,14 @@ def copy_occs(root: Component, links_dict):
         bodies = occs.bRepBodies
         # origin = occs.transform.translation
         # transform = adsk.core.Matrix3D.create()
-        name = re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])
+        name = occupancy_name_map[occs.fullPathName] if occs.fullPathName in occupancy_name_map else re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])
+        export_name = links_dict[name]["export_name"] if name in links_dict and "export_name" in links_dict[name] else name
+        # name = re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])
         
+        if export_name in allready_added_linked_components:
+            return
+        else:
+            allready_added_linked_components.add(export_name)
         # now transform from the origin of the body to the origin of the joint
         
         # Create new components from occs
@@ -46,6 +53,10 @@ def copy_occs(root: Component, links_dict):
                 # Use 10 decimal places for 0.1mm precision (since Fusion works in cm: 0.1mm = 0.01cm)
                 clean_array = [round(val, 10) for val in links_dict[name]['transform_array']]
                 transform.setWithArray(clean_array)
+            else:
+                app = adsk.core.Application.get()
+                ui = app.userInterface
+                ui.messageBox(f"Creating component {name} with identity transform (no transform_array found), searching with {occs.fullPathName} in {list(links_dict.keys())}" )
             new_occs = allOccs.addNewComponent(transform)
         except Exception as e:
             app = adsk.core.Application.get()
@@ -53,29 +64,47 @@ def copy_occs(root: Component, links_dict):
             ui.messageBox(f"Failed to create component {name}: {str(e)}. {str(links_dict[name]['transform_array'])} {links_dict[name]['source_type']}")
             return
             
-        if occs.component.name == 'base_link':
-            occs.component.name = 'old_component'
-            new_occs.component.name = 'base_link'
-        else:
-            name = re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])
-            occs.component.name = 'old_component'
-            new_occs.component.name = name
+        # Avoid changing the root component's name (raises RuntimeError)
+        # Also avoid changing the name for linked root components
+        try:
+            # if hasattr(occs, 'isReferencedComponent') and occs.isReferencedComponent:
+            #     # Never rename the root component
+            #     return copy_occs(occs.component, links_dict, allOccs=allOccs)
+            #     # new_occs.component.name = name
+            #     # we need to make sure the last one is exported only, and not the first one
+            #     # pass
+            # # elif hasattr(occs.component, 'parentDesign') and occs.component.parentDesign is not None:
+            # else:
+            if occs.component.name == 'base_link':
+                occs.component.name = 'old_component'
+                new_occs.component.name = 'base_link'
+            else:
+                export_name = re.sub('[ :()]', '_', export_name.split(" ", 1)[0].split(":", 1)[0])
+                if not occs.isReferencedComponent:
+                    occs.component.name = 'old_component'
+                new_occs.component.name = export_name
+            # If it's the root component or a linked root, do not change its name
+        except RuntimeError as e:
+            # If renaming fails, skip renaming and continue
+            pass
         new_occs = allOccs.item((allOccs.count-1))
         for i in range(bodies.count):
             body = bodies.item(i)
             body.copyToComponent(new_occs)
         
 
-    allOccs = root.occurrences
+    allOccs = allOccs or root.occurrences
     oldOccs = []
     coppy_list = [occs for occs in allOccs]
     for occs in coppy_list:
+        # check if this is a linked component, is so, do not copy main occurence, but childs only
         if occs.bRepBodies.count > 0:
             copy_body(allOccs, occs)
             oldOccs.append(occs)
 
     # for occs in oldOccs:
     #     occs.component.name = 'old_component'
+
 
 
 def export_stl(design, save_dir, components):
@@ -93,17 +122,21 @@ def export_stl(design, save_dir, components):
 
     # create a single exportManager instance
     exportMgr = design.exportManager
-    # get the script location
-    try: os.mkdir(save_dir + '/meshes')
-    except: pass
+    try: 
+        os.mkdir(save_dir + '/meshes')
+    except: 
+        pass
     scriptDir = save_dir + '/meshes'
-    # export the occurrence one by one in the component to a specified file
     for component in components:
         allOccus = component.allOccurrences
         for occ in allOccus:
-            if 'old_component' not in occ.component.name:
+            if 'old_component' not in occ.component.name and not occ.isReferencedComponent:
+                # check if there is another component with the same name. If there is, we need to make sure we are the last one, and export only the last one. This is because we need to keep the first one for the joint transform.
+                same = [a for a in allOccus if a.component.name == occ.component.name]
+                if len(same) > 1:
+                    if occ != same[-1]:
+                        continue
                 try:
-                    print(occ.component.name)
                     name = re.sub('[ :()]', '_', occ.component.name.split(" ", 1)[0].split(":", 1)[0])
                     fileName = scriptDir + "/" + name # occ.component.name
                     # create stl exportOptions
@@ -114,7 +147,7 @@ def export_stl(design, save_dir, components):
                     stlExportOptions.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementLow
                     exportMgr.execute(stlExportOptions)
                 except:
-                    print('Component ' + occ.component.name + 'has something wrong.')
+                    print('Component ' + occ.component.name + ' has something wrong.')
 
 
 def file_dialog(ui):

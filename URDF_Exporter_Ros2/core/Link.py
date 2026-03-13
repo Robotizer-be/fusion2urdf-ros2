@@ -11,7 +11,7 @@ from ..utils import utils
 import json 
 class Link:
 
-    def __init__(self, name, xyz, rpy, center_of_mass, repo, mass, inertia_tensor, material_name = 'silver'):
+    def __init__(self, name, xyz, rpy, repo, occurence=None, colors_dict={}, links_colors_dict={}, robot_name="robot", export_name=None):
         """
         Parameters
         ----------
@@ -31,18 +31,55 @@ class Link:
             tensor of the inertia
         """
         self.name = name
+        self.export_name = export_name or re.sub("[ :()]", "_", occurence.name.split(" ", 1)[0].split(":", 1)[0]) if occurence else name
         # xyz for visual
         self.xyz = [-_ for _ in xyz] # [0, 0, 0] # [-_ for _ in xyz]  # reverse the sign of xyz
         self.rpy = rpy  # roll pitch yaw
         # xyz for center of mass
-        self.center_of_mass = center_of_mass
-        self.link_xml = None
+        self.link_xml = ""
         self.repo = repo
         self.pkg_name = repo.split('/')[0]
         self.remain_repo_addr = repo[len(self.pkg_name):]
-        self.mass = mass
-        self.inertia_tensor = inertia_tensor
-        self.material_name = material_name
+        
+        self.material_name = 'silver' #material_name
+        self.occurrence: adsk.fusion.Occurrence = occurence
+        self.mass = 0.0
+        self.center_of_mass = [0.0, 0.0, 0.0]
+        self.inertia_tensor = [0,0,0,0,0,0]
+        if occurence:
+            prop = occurence.getPhysicalProperties(adsk.fusion.CalculationAccuracy.VeryHighCalculationAccuracy)
+            self.mass = prop.mass
+            self.center_of_mass = [_/100.0 for _ in prop.centerOfMass.asArray()] ## cm to m
+            (_, xx, yy, zz, xy, yz, xz) = prop.getXYZMomentsOfInertia()
+            moment_inertia_world = [_ / 10000.0 for _ in [xx, yy, zz, xy, yz, xz] ] ## kg / cm^2 -> kg/m^2
+            self.inertia_tensor = utils.origin2center_of_mass(moment_inertia_world, self.center_of_mass, self.mass)
+            
+            if occurence.bRepBodies.count > 0 or occurence.component.bRepBodies.count > 0:
+                for body in occurence.bRepBodies or occurence.component.bRepBodies:
+                    color = body.appearance.appearanceProperties.itemByName('Color')
+                    opacity = occurence.component.opacity
+                    body_opacity = body.opacity
+                    opacity= min(opacity, body_opacity)
+                    component_color = occurence.component.componentColor
+                    if color and (color.value.red == 255 or color.value.green == 255 or color.value.blue == 255):
+                        color = component_color
+                    else:
+                        color = color.value
+                    if color and (color.red != 255 or color.green != 255 or color.blue != 255):
+                        colorValue = f"{str(round(color.red/255,3))} {str(round(color.green/255,3))} {str(round(color.blue/255,3))} {str(round(opacity,3))}"
+                        try:
+                            existing_color = [a[0] for a in colors_dict.items() if a[1] and a[1] == colorValue][0]
+                            if existing_color:
+                                links_colors_dict[self.name] = existing_color
+                        except:
+                            # generate random name
+                            new_color_name = 'color' + str(len(colors_dict))
+                            colors_dict[new_color_name] = colorValue
+                            links_colors_dict[self.name] = new_color_name
+                        break
+                self.material_name = robot_name + "_" + (links_colors_dict[self.name] if self.name in links_colors_dict else "silver")
+        else:
+            print(f"Warning: No occurrence found for link {name}. The mass, inertia, and color information will be set to default values.")
         
     def make_link_xml(self):
         """
@@ -52,7 +89,7 @@ class Link:
         link = Element('link')
         link.attrib = {'name': "${prefix}" + self.name}
         
-        if self.name != 'base_link':
+        if self.name != 'base_link' and self.occurrence:
             #inertial
             inertial = SubElement(link, 'inertial')
             origin_i = SubElement(inertial, 'origin')
@@ -72,7 +109,7 @@ class Link:
             geometry_v = SubElement(visual, 'geometry')
             mesh_v = SubElement(geometry_v, 'mesh')
             # mesh_v.attrib = {'filename':'file://' + '$(find %s)' % self.pkg_name + self.remain_repo_addr + self.name + '.stl','scale':'0.001 0.001 0.001'}
-            mesh_v.attrib = {'filename':'package://%s' % self.pkg_name + self.remain_repo_addr + self.name + '.stl','scale':'0.001 0.001 0.001'}
+            mesh_v.attrib = {'filename':'package://%s' % self.pkg_name + self.remain_repo_addr + self.export_name + '.stl','scale':'0.001 0.001 0.001'}
             material = SubElement(visual, 'material')
             material.attrib = {'name':'%s' % self.material_name}
             
@@ -82,91 +119,90 @@ class Link:
             origin_c.attrib = {'xyz':' '.join([str(_) for _ in self.xyz]), 'rpy':' '.join([str(_) for _ in self.rpy])}
             geometry_c = SubElement(collision, 'geometry')
             mesh_c = SubElement(geometry_c, 'mesh')
-            mesh_c.attrib = {'filename':'package://%s' % self.pkg_name + self.remain_repo_addr + self.name + '.stl','scale':'0.001 0.001 0.001'}
+            mesh_c.attrib = {'filename':'package://%s' % self.pkg_name + self.remain_repo_addr + self.export_name + '.stl','scale':'0.001 0.001 0.001'}
 
         # print("\n".join(utils.prettify(link).split("\n")[1:]))
         self.link_xml = "\n".join(utils.prettify(link).split("\n")[1:])
 
 
-def make_inertial_dict(root, msg, colors_dict, links_colors_dict, ui, design):
-    """      
-    Parameters
-    ----------
-    root: adsk.fusion.Design.cast(product)
-        Root component
-    msg: str
-        Tell the status
+# def make_inertial_dict(root, msg, colors_dict, links_colors_dict, ui, design):
+#     """      
+#     Parameters
+#     ----------
+#     root: adsk.fusion.Design.cast(product)
+#         Root component
+#     msg: str
+#         Tell the status
         
-    Returns
-    ----------
-    inertial_dict: {name:{mass, inertia, center_of_mass}}
+#     Returns
+#     ----------
+#     inertial_dict: {name:{mass, inertia, center_of_mass}}
     
-    msg: str
-        Tell the status
-    """
-    # Get component properties.      
-    allOccs = root.occurrences
-    inertial_dict = {}
+#     msg: str
+#         Tell the status
+#     """
+#     # Get component properties.      
+#     allOccs = root.occurrences
+#     inertial_dict = {}
     
-    # Add base_link
-    inertial_dict['base_link'] = {'mass':0.0, 'inertia':[0,0,0,0,0,0], 'center_of_mass':[0,0,0]}
-    for occs in allOccs:
-        # Skip the root component.
-        occs_dict = {}
-        prop = occs.getPhysicalProperties(adsk.fusion.CalculationAccuracy.VeryHighCalculationAccuracy)
+#     # Add base_link
+#     inertial_dict['base_link'] = {'mass':0.0, 'inertia':[0,0,0,0,0,0], 'center_of_mass':[0,0,0]}
+#     for occs in allOccs:
+#         # Skip the root component.
+#         occs_dict = {}
+#         prop = occs.getPhysicalProperties(adsk.fusion.CalculationAccuracy.VeryHighCalculationAccuracy)
         
-        occs_dict['name'] = re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])
+#         occs_dict['name'] = re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])
 
-        mass = prop.mass  # kg
-        occs_dict['mass'] = mass
-        center_of_mass = [_/100.0 for _ in prop.centerOfMass.asArray()] ## cm to m
-        occs_dict['center_of_mass'] = center_of_mass
+#         mass = prop.mass  # kg
+#         occs_dict['mass'] = mass
+#         center_of_mass = [_/100.0 for _ in prop.centerOfMass.asArray()] ## cm to m
+#         occs_dict['center_of_mass'] = center_of_mass
 
-        # https://help.autodesk.com/view/fusion360/ENU/?guid=GUID-ce341ee6-4490-11e5-b25b-f8b156d7cd97
-        (_, xx, yy, zz, xy, yz, xz) = prop.getXYZMomentsOfInertia()
-        moment_inertia_world = [_ / 10000.0 for _ in [xx, yy, zz, xy, yz, xz] ] ## kg / cm^2 -> kg/m^2
-        occs_dict['inertia'] = utils.origin2center_of_mass(moment_inertia_world, center_of_mass, mass)
-        
-        if occs.component.name == 'base_link':
-            inertial_dict['base_link'] = occs_dict
-        else:
-            inertial_dict[re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])] = occs_dict
-            if occs.bRepBodies.count > 0:
-                appearance = occs.bRepBodies[0].appearance
-                for body in occs.bRepBodies:
-                    color = body.appearance.appearanceProperties.itemByName('Color')
-                    if color and (color.value.red != 255 or color.value.green != 255 or color.value.blue != 255):
-                        colorValue = f"{str(round(color.value.red/255,3))} {str(round(color.value.green/255,3))} {str(round(color.value.blue/255,3))} {str(round((color.value.opacity if color.value.opacity > 10 else 25)/255,3))}"
-                        try:
-                            existing_color = [a[0] for a in colors_dict.items() if a[1] and a[1] == colorValue][0]
-                            if existing_color:
-                                links_colors_dict[re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])] = existing_color
-                        except:
-                            # generate random name
-                            new_color_name = 'color' + str(len(colors_dict))
-                            colors_dict[new_color_name] = colorValue
-                            links_colors_dict[re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])] = new_color_name
-                        break
-                # color = None
-                # try:
-                #     globalColor = design.appearances.itemByName(appearance.name)
-                # except:
-                #     globalColor = None
-                # if globalColor is None:
-                #     color = occs.bRepBodies[0].appearance.appearanceProperties.itemByName('Color')
-                # else:
-                #     color = globalColor.appearanceProperties.itemByName('Color')
-                # if color and (color.value.red != 255 or color.value.green != 255 or color.value.blue != 255):
-                #     colorValue = f"{str(round(color.value.red/255,3))} {str(round(color.value.green/255,3))} {str(round(color.value.blue/255,3))} {str(round(color.value.opacity/255,3))}"
-                #     try:
-                #         existing_color = [a[0] for a in colors_dict.items() if a[1] and a[1] == colorValue][0]
-                #         if existing_color:
-                #             links_colors_dict[re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])] = existing_color
-                #     except:
-                #         # generate random name
-                #         new_color_name = 'color' + str(len(colors_dict))
-                #         colors_dict[new_color_name] = colorValue
-                #         links_colors_dict[re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])] = new_color_name
-                #     # ui.messageBox("r = {0}, g = {1}, b = {2}".format(color.value.red, color.value.green, color.value.blue))
+#         # https://help.autodesk.com/view/fusion360/ENU/?guid=GUID-ce341ee6-4490-11e5-b25b-f8b156d7cd97
+#         (_, xx, yy, zz, xy, yz, xz) = prop.getXYZMomentsOfInertia()
+#         moment_inertia_world = [_ / 10000.0 for _ in [xx, yy, zz, xy, yz, xz] ] ## kg / cm^2 -> kg/m^2
+#         occs_dict['inertia'] = utils.origin2center_of_mass(moment_inertia_world, center_of_mass, mass)
+#         if occs.component.name == 'base_link':
+#             inertial_dict['base_link'] = occs_dict
+#         else:
+#             inertial_dict[re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])] = occs_dict
+#             if occs.bRepBodies.count > 0:
+#                 appearance = occs.bRepBodies[0].appearance
+#                 for body in occs.bRepBodies:
+#                     color = body.appearance.appearanceProperties.itemByName('Color')
+#                     if color and (color.value.red != 255 or color.value.green != 255 or color.value.blue != 255):
+#                         colorValue = f"{str(round(color.value.red/255,3))} {str(round(color.value.green/255,3))} {str(round(color.value.blue/255,3))} {str(round((color.value.opacity if color.value.opacity > 10 else 25)/255,3))}"
+#                         try:
+#                             existing_color = [a[0] for a in colors_dict.items() if a[1] and a[1] == colorValue][0]
+#                             if existing_color:
+#                                 links_colors_dict[link_name] = existing_color
+#                         except:
+#                             # generate random name
+#                             new_color_name = 'color' + str(len(colors_dict))
+#                             colors_dict[new_color_name] = colorValue
+#                             links_colors_dict[link_name] = new_color_name
+#                         break
+#                 # color = None
+#                 # try:
+#                 #     globalColor = design.appearances.itemByName(appearance.name)
+#                 # except:
+#                 #     globalColor = None
+#                 # if globalColor is None:
+#                 #     color = occs.bRepBodies[0].appearance.appearanceProperties.itemByName('Color')
+#                 # else:
+#                 #     color = globalColor.appearanceProperties.itemByName('Color')
+#                 # if color and (color.value.red != 255 or color.value.green != 255 or color.value.blue != 255):
+#                 #     colorValue = f"{str(round(color.value.red/255,3))} {str(round(color.value.green/255,3))} {str(round(color.value.blue/255,3))} {str(round(color.value.opacity/255,3))}"
+#                 #     try:
+#                 #         existing_color = [a[0] for a in colors_dict.items() if a[1] and a[1] == colorValue][0]
+#                 #         if existing_color:
+#                 #             links_colors_dict[re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])] = existing_color
+#                 #     except:
+#                 #         # generate random name
+#                 #         new_color_name = 'color' + str(len(colors_dict))
+#                 #         colors_dict[new_color_name] = colorValue
+#                 #         links_colors_dict[re.sub('[ :()]', '_', occs.name.split(" ", 1)[0].split(":", 1)[0])] = new_color_name
+#                 #     # ui.messageBox("r = {0}, g = {1}, b = {2}".format(color.value.red, color.value.green, color.value.blue))
 
-    return inertial_dict, msg, colors_dict, links_colors_dict
+#     return inertial_dict, msg, colors_dict, links_colors_dict

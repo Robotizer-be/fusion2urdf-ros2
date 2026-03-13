@@ -14,10 +14,11 @@ from ..utils import utils
 def write_link_urdf(
     joints_dict,
     repo,
+    links_dict,
     links_xyz_dict,
     links_rpy_dict,
     file_name,
-    inertial_dict,
+    colors_dict,
     link_colors_dict,
     robot_name,
 ):
@@ -35,8 +36,8 @@ def write_link_urdf(
         xyz information of the each link
     file_name: str
         urdf full path
-    inertial_dict:
-        information of the each inertial
+    links_dict: dict
+        information of the each link
 
     Note
     ----------
@@ -45,17 +46,18 @@ def write_link_urdf(
     """
     with open(file_name, mode="a") as f:
         # for base_link
-        center_of_mass = inertial_dict["base_link"]["center_of_mass"]
         # calculate the dieference between the
         link = Link.Link(
             name="base_link",
             xyz=[0, 0, 0],
             rpy=[0, 0, 0],
-            center_of_mass=center_of_mass,
+            # center_of_mass=center_of_mass,
             repo=repo,
-            mass=inertial_dict["base_link"]["mass"],
-            inertia_tensor=inertial_dict["base_link"]["inertia"],
-            material_name=robot_name + "_silver",
+            # mass=inertial_dict["base_link"]["mass"],
+            # inertia_tensor=inertial_dict["base_link"]["inertia"],
+            colors_dict=colors_dict,
+            links_colors_dict=link_colors_dict,
+            robot_name=robot_name,
         )
         links_xyz_dict[link.name] = link.xyz
         link.make_link_xml()
@@ -67,12 +69,6 @@ def write_link_urdf(
             name = joints_dict[joint]["child"]
             # calculate the offset from the joint until origin of this link
 
-            center_of_mass = [
-                i - j
-                for i, j in zip(
-                    inertial_dict[name]["center_of_mass"], joints_dict[joint]["xyz"]
-                )
-            ]
             link = Link.Link(
                 name=name,
                 xyz=[0, 0, 0],
@@ -81,14 +77,21 @@ def write_link_urdf(
                     0,
                     0,
                 ],  # xyz=joints_dict[joint]['xyz_child'] if 'xyz_child' in joints_dict[joint] else [0,0,0], rpy=joints_dict[joint]['rpy_child'] if 'rpy_child' in joints_dict[joint] else [0,0,0], \
-                center_of_mass=center_of_mass,
+                # center_of_mass=center_of_mass,
                 repo=repo,
-                mass=inertial_dict[name]["mass"],
-                inertia_tensor=inertial_dict[name]["inertia"],
-                material_name=robot_name
-                + "_"
-                + (link_colors_dict[name] if name in link_colors_dict else "silver"),
+                # mass=inertial_dict[name]["mass"],
+                colors_dict=colors_dict,
+                links_colors_dict=link_colors_dict,
+                export_name=links_dict[name]["export_name"] if name in links_dict and "export_name" in links_dict[name] else None,
+                occurence=links_dict[name]["occurence"] if name in links_dict and "occurence" in links_dict[name] else None,
+                robot_name=robot_name,
             )
+            link.center_of_mass = [
+                i - j
+                for i, j in zip(
+                    link.center_of_mass, joints_dict[joint]["xyz"]
+                )
+            ]
             links_xyz_dict[link.name] = (
                 link.xyz
             )  # joints_dict[joint]['xyz'] # do not use the inverted distance from Link
@@ -171,12 +174,13 @@ def write_gazebo_endtag(file_name):
 
 def write_urdf(
     joints_dict,
+    links_dict,
     links_xyz_dict,
     links_rpy_dict,
-    inertial_dict,
     package_name,
     robot_name,
     save_dir,
+    colors_dict,
     link_colors_dict,
 ):
     try:
@@ -228,10 +232,11 @@ def write_urdf(
     write_link_urdf(
         joints_dict,
         repo,
+        links_dict,
         links_xyz_dict,
         links_rpy_dict,
         file_name,
-        inertial_dict,
+        colors_dict,
         link_colors_dict,
         robot_name,
     )
@@ -243,7 +248,6 @@ def write_materials_xacro(
     joints_dict,
     links_xyz_dict,
     links_rpy_dict,
-    inertial_dict,
     package_name,
     robot_name,
     save_dir,
@@ -279,7 +283,6 @@ def write_transmissions_xacro(
     joints_dict,
     links_xyz_dict,
     links_rpy_dict,
-    inertial_dict,
     package_name,
     robot_name,
     save_dir,
@@ -356,7 +359,6 @@ def write_gazebo_xacro(
     joints_dict,
     links_xyz_dict,
     links_rpy_dict,
-    inertial_dict,
     package_name,
     robot_name,
     save_dir,

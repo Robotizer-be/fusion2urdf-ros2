@@ -47,7 +47,8 @@ def run(context):
             return 0
 
         save_dir = save_dir + '/' + package_name
-        try: os.mkdir(save_dir)
+        try: 
+            os.mkdir(save_dir)
         except: pass
 
         package_dir = os.path.abspath(os.path.dirname(__file__)) + '/package/'
@@ -56,23 +57,23 @@ def run(context):
         # set dictionaries
 
         # Generate joints_dict. All joints are related to root.
-        joints_dict, links_dict, msg = Joint.make_joints_dict(root, msg)
+        joints_dict, links_dict, occupancy_name_map, msg = Joint.make_joints_dict(root, msg)
         if msg != success_msg:
             ui.messageBox(msg, title)
             return 0
 
         # joints_dict['base_link'] = {'type':'fixed', 'parent':'base_link', 'child':'base_link', 'axis':[0,0,0], 'xyz':[0,0,0], 'rpy':[0,0,0], 'upper_limit': 0, 'lower_limit': 0}
         # Generate inertial_dict
-        links_colors_dict = {}
         colors_dict = {}
-        inertial_dict, msg, colors_dict, links_colors_dict = Link.make_inertial_dict(root, msg, colors_dict, links_colors_dict, ui, design)
-        if msg != success_msg:
-            ui.messageBox(msg, title)
-            return 0
-        elif not 'base_link' in inertial_dict:
-            msg = 'There is no base_link. Please set base_link and run again.'
-            ui.messageBox(msg, title)
-            return 0
+        links_colors_dict = {}
+        # inertial_dict, msg, colors_dict, links_colors_dict = Link.make_inertial_dict(root, msg, colors_dict, links_colors_dict, ui, design)
+        # if msg != success_msg:
+        #     ui.messageBox(msg, title)
+        #     return 0
+        # elif not 'base_link' in inertial_dict:
+        #     msg = 'There is no base_link. Please set base_link and run again.'
+        #     ui.messageBox(msg, title)
+        #     return 0
 
         links_xyz_dict = {}
         links_rpy_dict = {}
@@ -80,10 +81,10 @@ def run(context):
 
         # --------------------
         # Generate URDF
-        Write.write_urdf(joints_dict, links_xyz_dict, links_rpy_dict, inertial_dict, package_name, robot_name, save_dir, links_colors_dict)
-        Write.write_materials_xacro(joints_dict, links_xyz_dict, links_rpy_dict, inertial_dict, package_name, robot_name, save_dir, colors_dict)
-        Write.write_transmissions_xacro(joints_dict, links_xyz_dict, links_rpy_dict, inertial_dict, package_name, robot_name, save_dir)
-        Write.write_gazebo_xacro(joints_dict, links_xyz_dict, links_rpy_dict, inertial_dict, package_name, robot_name, save_dir)
+        Write.write_urdf(joints_dict, links_dict, links_xyz_dict, links_rpy_dict,package_name, robot_name, save_dir,colors_dict, links_colors_dict)
+        Write.write_materials_xacro(joints_dict, links_xyz_dict, links_rpy_dict, package_name, robot_name, save_dir, colors_dict)
+        Write.write_transmissions_xacro(joints_dict, links_xyz_dict, links_rpy_dict,package_name, robot_name, save_dir)
+        Write.write_gazebo_xacro(joints_dict, links_xyz_dict, links_rpy_dict,package_name, robot_name, save_dir)
         Write.write_display_launch(package_name, robot_name, save_dir)
         Write.write_state_publisher_launch(package_name, robot_name, save_dir)
         Write.write_rviz_launch(package_name, robot_name, save_dir)
@@ -94,7 +95,7 @@ def run(context):
         utils.update_package_xml(save_dir, package_name)
 
         # Generate STl files
-        utils.copy_occs(root, links_dict)
+        utils.copy_occs(root, links_dict, occupancy_name_map)
         utils.export_stl(design, save_dir, components)
 
         ui.messageBox(msg, title)

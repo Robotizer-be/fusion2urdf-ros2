@@ -115,7 +115,7 @@ class Joint:
         self.tran_xml = "\n".join(utils.prettify(tran).split("\n")[1:])
 
 
-def make_joint_dict(joint, links_dict, msg, all_joints):
+def make_joint_dict(joint, links_dict, msg, all_joints, prefix_chain=[], occurence_name_map={}):
     joint_type_list = [
         "fixed",
         "revolute",
@@ -187,15 +187,22 @@ def make_joint_dict(joint, links_dict, msg, all_joints):
     # elif joint_type == 'fixed':
     #     pass
 
-    if joint.occurrenceTwo is None:  # .component.name == 'base_link':
+    # Use joint prefix from links_dict for linked occurrences if present
+    def get_link_name(occ, joint, occurence_name_map, prefix_chain=[]):
+        if occ.fullPathName in occurence_name_map:
+            return occurence_name_map[occ.fullPathName]
+        base = re.sub("[ :()]", "_", occ.name.split(" ", 1)[0].split(":", 1)[0])
+        new_prefix = None
+        if occ.isReferencedComponent:
+            new_prefix = joint.name
+        occurence_name_map[occ.fullPathName] = "_".join((prefix_chain or []) + ([new_prefix] if new_prefix else []) + [base])
+        return occurence_name_map[occ.fullPathName]
+
+    if joint.occurrenceTwo is None:
         joint_dict["parent"] = "base_link"
     else:
-        joint_dict["parent"] = re.sub(
-            "[ :()]", "_", joint.occurrenceTwo.name.split(" ", 1)[0].split(":", 1)[0]
-        )
-    joint_dict["child"] = re.sub(
-        "[ :()]", "_", joint.occurrenceOne.name.split(" ", 1)[0].split(":", 1)[0]
-    )
+        joint_dict["parent"] = get_link_name(joint.occurrenceTwo, joint, occurence_name_map=occurence_name_map, prefix_chain=prefix_chain)
+    joint_dict["child"] = get_link_name(joint.occurrenceOne, joint, occurence_name_map=occurence_name_map, prefix_chain=prefix_chain)
 
     # There seem to be a problem with geometryOrOriginTwo. To calcualte the correct orogin of the generated stl files following approach was used.
     # https://forums.autodesk.com/t5/fusion-360-api-and-scripts/difference-of-geometryororiginone-and-geometryororiginonetwo/m-p/9837767
@@ -553,9 +560,10 @@ def make_joint_dict(joint, links_dict, msg, all_joints):
             if joint.geometryOrOriginOne:
                 transform2 = Matrix3D.create()
                 if joint_dict["parent"] in links_dict:
-                    transform2.setWithArray(
-                        links_dict[joint_dict["parent"]]["transform_array"]
-                    )
+                    if "transform_array" in links_dict[joint_dict["parent"]]:
+                        transform2.setWithArray(
+                            links_dict[joint_dict["parent"]]["transform_array"]
+                        )
                 else:
                     # first create the joint where there is a child (OccurenceOne) with this name
                     parent_joint = next(
@@ -572,8 +580,12 @@ def make_joint_dict(joint, links_dict, msg, all_joints):
                         None,
                     )
                     if parent_joint:
+                        # check if occurenceOne is a linked component, if so we add the joint name to prefix_chain
+                        extra_prefix = None
+                        if parent_joint.occurrenceOne and parent_joint.occurrenceOne.isReferencedComponent:
+                            extra_prefix = joint.name
                         pp_joint, links_dict, msg = make_joint_dict(
-                            parent_joint, links_dict, msg, all_joints
+                            parent_joint, links_dict, msg, all_joints, occurence_name_map=occurence_name_map, prefix_chain=prefix_chain + [extra_prefix] if extra_prefix else prefix_chain
                         )
                         if pp_joint is None or links_dict is None:
                             return None, None, msg
@@ -587,9 +599,10 @@ def make_joint_dict(joint, links_dict, msg, all_joints):
                             msg = f"Cannot find parent link {joint_dict['parent']} for joint {joint.name}. Please check the joint connections. {parent_joint.name if parent_joint else ' NO PARENT'} {parent_joint.occurrenceTwo}"
                             return None, None, msg
                     else:
-                        transform2.setWithArray(
-                            links_dict[joint_dict["parent"]]["transform_array"]
-                        )
+                        if "transform_array" in links_dict[joint_dict["parent"]]:
+                            transform2.setWithArray(
+                                links_dict[joint_dict["parent"]]["transform_array"]
+                            )
                 transform1, geometry_type = (
                     get_joint_geometry_matrix(joint.geometryOrOriginOne)
                     if joint.geometryOrOriginOne
@@ -775,6 +788,16 @@ def make_joint_dict(joint, links_dict, msg, all_joints):
                 links_dict[joint_dict["child"]] = {
                     "transform_array": transform_child.asArray(),  # Use the validated transform with rotation
                     "source_type": source_type,
+                    "occurence" : joint.occurrenceOne if joint.occurrenceOne else None,
+                    "export_name": re.sub("[ :()]", "_", joint.occurrenceOne.name.split(" ", 1)[0].split(":", 1)[0]) if joint.occurrenceOne else None
+                }
+            else:
+                links_dict[joint_dict["child"]] = {
+                    "source_type": source_type,
+                    "occurence" : joint.occurrenceOne if joint.occurrenceOne else None,
+                    "export_name": re.sub("[ :()]", "_", joint.occurrenceOne.name.split(" ", 1)[0].split(":", 1)[0]) if joint.occurrenceOne else None,
+                    # create a transform amtrix which moces x, y, z
+                    "transform_array": [1, 0, 0, joint_dict["xyz"][0], 0, 1, 0, joint_dict["xyz"][1], 0, 0, 1, joint_dict["xyz"][2], 0, 0, 0, 1]
                 }
         except Exception as e:
             msg = f"2. Error creating child transform 2 for {joint_dict['child']}: {str(e)}"
@@ -791,6 +814,12 @@ def make_joint_dict(joint, links_dict, msg, all_joints):
                 round(i / 100.0, 6) for i in data
             ]  # converted to meter
             joint_dict["rpy"] = [0, 0, 0]  # roll pitch yaw
+            links_dict[joint_dict["child"]] = {
+                "occurence" : joint.occurrenceOne if joint.occurrenceOne else None,
+                "export_name": re.sub("[ :()]", "_", joint.occurrenceOne.name.split(" ", 1)[0].split(":", 1)[0]) if joint.occurrenceOne else None,
+                # create a transform amtrix which moces x, y, z
+                "transform_array": [1, 0, 0, joint_dict["xyz"][0], 0, 1, 0, joint_dict["xyz"][1], 0, 0, 1, joint_dict["xyz"][2], 0, 0, 0, 1]
+            }
         except:
             msg = (
                 joint.name
@@ -826,12 +855,12 @@ def make_joints_dict(root: Component, msg):
 
     joints_dict = {}
     links_dict = {}
-
+    occupancy_name_map = {}  # Map from occurrence name to joint name for linked components
     for joint in root.joints:
         joint_dict, links_dict, msg = make_joint_dict(
-            joint, links_dict, msg, root.joints
+            joint, links_dict, msg, root.joints, occurence_name_map=occupancy_name_map
         )  # joint_dict
         if joint_dict is None or links_dict is None:
             break
         joints_dict[joint.name] = joint_dict
-    return joints_dict, links_dict, msg
+    return joints_dict, links_dict, occupancy_name_map, msg
